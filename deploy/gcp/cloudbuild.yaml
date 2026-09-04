@@ -1,0 +1,64 @@
+substitutions:
+  _REGION: europe-west1
+  _REPOSITORY: legal-eye
+  _DOCLING_SERVICE: legal-eye-docling
+  _ORCHESTRATOR_SERVICE: legal-eye-orchestrator
+  _OPENCONTRACTS_REPOSITORY: https://github.com/Open-Source-Legal/OpenContracts.git
+  _OPENCONTRACTS_COMMIT: 2cd5230d90cd666e9536103801fdcb118149fba7
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  - id: build-docling
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/docling:$COMMIT_SHA
+      - --file=services/docling/Dockerfile
+      - services/docling
+
+  - id: build-orchestrator
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/orchestrator:$COMMIT_SHA
+      - --file=services/orchestrator/Dockerfile
+      - services/orchestrator
+
+  - id: fetch-opencontracts
+    name: gcr.io/cloud-builders/git
+    args:
+      - clone
+      - --filter=blob:none
+      - ${_OPENCONTRACTS_REPOSITORY}
+      - /workspace/upstream/opencontracts
+
+  - id: pin-opencontracts
+    name: gcr.io/cloud-builders/git
+    dir: /workspace/upstream/opencontracts
+    args: [checkout, ${_OPENCONTRACTS_COMMIT}]
+
+  - id: verify-opencontracts-pin
+    name: gcr.io/cloud-builders/git
+    dir: /workspace/upstream/opencontracts
+    entrypoint: bash
+    args:
+      - -ceu
+      - test "$(git rev-parse HEAD)" = "${_OPENCONTRACTS_COMMIT}"
+
+  - id: build-opencontracts
+    name: gcr.io/cloud-builders/docker
+    dir: /workspace/upstream/opencontracts
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/opencontracts:${_OPENCONTRACTS_COMMIT}
+      - --file=compose/production/django/Dockerfile
+      - .
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/docling:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/orchestrator:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/opencontracts:${_OPENCONTRACTS_COMMIT}
+
