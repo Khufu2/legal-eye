@@ -6,6 +6,12 @@ bulk ingest, embedding, computational analysis, redistribution and attribution.
 
 ## Current state
 
+- Tanzania OAG is active following direct permission asserted by the product owner on 5 September
+  2026. The first governed sync captured 5,495 official catalogue records: 316 Acts, 542 revised
+  Acts, 4,481 subsidiary instruments, 126 Bills, 26 parliamentary resolutions and four guidelines.
+  Each record retains its official URL, source metadata, attribution and content hash. All 5,495
+  official-PDF fetch/Docling jobs are queued; until those jobs complete, the catalogue is metadata,
+  not a searchable full-text Tanzanian corpus.
 - UK Legislation is approved under the Open Government Licence v3, subject to per-item notices,
   third-party rights and required attribution. Twenty current official metadata records have been
   ingested with source URLs, hashes, provenance and an evaluation case for each record.
@@ -31,4 +37,3 @@ bulk ingest, embedding, computational analysis, redistribution and attribution.
 Every run writes `connector_runs`, `source_sync_cursors` and `source_ingest_objects`. Retries must
 use ETag/Last-Modified and canonical IDs so that ingestion is idempotent. Failed or quarantined
 items never enter the public catalog.
-

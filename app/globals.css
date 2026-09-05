@@ -120,6 +120,7 @@ button{transition:color .14s ease,background .14s ease,border-color .14s ease,bo
 .context-head{height:62px;padding:0 18px;border-color:#e2e5e2;background:#f7f8f6e8;box-shadow:0 1px 0 #fff8;backdrop-filter:blur(20px) saturate(1.2)}
 .context-head>div{gap:9px}.context-head>div:first-child>span{color:#747c77;font-size:13px}.context-head>div:first-child b{color:#1f2925;font-weight:620}.context-head>div:first-child svg{color:#a3aaa6}
 .context-pill,.clock{height:34px;border:0;border-radius:9px;background:#ecefec;color:#48514c;font-size:12px;box-shadow:inset 0 0 0 1px #dfe3df}
+.auth-form{display:grid;gap:16px;padding-top:8px}.auth-form label{display:grid;gap:7px;color:#333d38;font-size:13px;font-weight:650}.auth-form input{height:42px;font-size:15px}.auth-session{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:18px 0 4px}.auth-session>svg{width:30px;height:30px;color:#23654a}.auth-session div{display:grid;gap:3px}.auth-session b{font-size:14px}.auth-session span{color:#68716c;font-size:12px}
 .context-pill:hover,.clock:hover{background:#fff;box-shadow:inset 0 0 0 1px #cfd5d1,var(--elevated)}
 .privacy-pill{background:#e8efec;color:#28594d}.context-head kbd{font-size:11px}
 .system-bar{height:31px;padding:0 17px;border-color:#dde1de;background:#f7f8f6eb;color:#7a827d;font-size:11px;backdrop-filter:blur(14px)}
