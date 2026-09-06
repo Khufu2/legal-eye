@@ -9,7 +9,7 @@ proven capabilities. A screen or database table does not count as a working prod
 Legal Eye currently has a credible architecture, a strong premium product prototype, a live
 Supabase control plane, policy-gated source registry and deployed Edge APIs. It is **not yet a fully
 functional legal operating system**. The public catalogue contains 5,495 official Tanzania OAG
-records plus 20 UK records, but the Tanzanian PDF/Docling queue has not yet produced searchable
+records, 250 EUR-Lex records and 20 UK records, but the structural processing queues have not yet produced searchable
 legal text chunks, structured legislation expressions, case opinions or citation edges. A demo
 organization and owner exist; real client matters and firm work product do not.
 
@@ -21,7 +21,7 @@ organization and owner exist; real client matters and firm work product do not.
 | OpenContracts | Audited MIT commit, adapter contract and Cloud Build boundary | Running API/workers, dedicated database/Redis, tenant adapter, migrations, health/load/contract tests and upstream security hardening |
 | Docling | Private parser service source with format, size, provenance and non-root controls | Deployed private image, malware gate, model artifact management, object storage, processing queue, golden legal-document suite and load tests |
 | LangGraph | Inspectable plan/execute/review/deliver service with human checkpoint | Running service, durable queue/retry/idempotency, token exchange, cancellation, failure injection, observability and recovery drills |
-| Public corpus | 136 registered sources; Tanzania OAG, UK and EUR-Lex policy-approved; 5,515 governed metadata records | Completed PDF retrieval, structural CLML/AKN parsing, cases, courts, citations, versions, amendments, authority treatment, embeddings and reconciliation |
+| Public corpus | 136 registered sources; Tanzania OAG, UK and EUR-Lex policy-approved; 5,765 governed metadata records | Completed PDF retrieval, structural CLML/AKN/CELLAR parsing, cases, courts, citations, versions, amendments, authority treatment, embeddings and reconciliation |
 | African moat | 5,495 official Tanzania OAG catalogue records, 30 jurisdictions and 12 parser plug-in registrations | Process the queued PDFs, ingest judgments/Gazettes, build court hierarchy, citation fixtures, treatment graph and lawyer QA |
 | Legal research | Hybrid retrieval functions and evidence-first API design | Searchable evidence corpus, temporal/authority ranking benchmarks, real citation verification, saved sessions and live three-pane state |
 | Drafting/editor | Premium editor prototype and template-licence schema | DOCX round-trip, track changes, styles, comments, version merge, template importer, clause bank, playbook enforcement and Word add-in |
@@ -39,8 +39,9 @@ organization and owner exist; real client matters and firm work product do not.
 
 - Supabase project `Legal` is healthy on PostgreSQL 17 in `eu-central-1`.
 - 136 source-registry records, 30 jurisdictions and 12 citation-parser registrations exist.
-- 5,495 Tanzania OAG and 20 UK legal-document metadata records exist. The Tanzania run preserved
-  5,495 source objects and queued 5,495 official-PDF fetch/Docling jobs.
+- 5,495 Tanzania OAG, 250 EUR-Lex and 20 UK legal-document metadata records exist. The Tanzania run preserved
+  5,495 source objects and queued 5,495 official-PDF fetch/Docling jobs; the EU run preserved 250
+  CELLAR metadata objects and queued 250 rights-aware structured-content jobs.
 - Zero legal text chunks, authorities, citation edges, legislation works/expressions, private
   documents, matters, review projects, agent runs, workflows, monitors, SSO providers, SCIM tokens,
   evaluation runs, security-test runs or compliance-evidence records exist.

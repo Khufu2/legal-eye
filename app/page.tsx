@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity, ArrowUpRight, BookOpen, Bot, BriefcaseBusiness, Check, ChevronDown,
   ChevronRight, CircleAlert, ClipboardCheck, Clock3, Columns3, Command as CommandIcon,
   FileClock, FilePenLine, Files, FolderLock, Gavel, Globe2, LibraryBig, ListChecks,
   LockKeyhole, MessageSquareText, MoreHorizontal, PanelRightOpen, Play, Plus, Search,
-  ShieldCheck, Sparkles, Table2, Upload, Workflow, X,
+  Database, Eye, KeyRound, Network, ShieldCheck, Sparkles, Table2, Upload, Users, Workflow, X,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -25,12 +25,14 @@ import { Progress } from "@/components/ui/progress";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 
-type View = "ask"|"research"|"draft"|"review"|"tables"|"lists"|"matters"|"vault"|"agent"|"skills"|"workflows"|"monitor";
+type View = "ask"|"research"|"draft"|"review"|"tables"|"lists"|"matters"|"vault"|"agent"|"skills"|"workflows"|"monitor"|"trust";
 type Tone = "neutral"|"green"|"blue"|"amber"|"red";
 type Source = { id:string; title:string; citation:string; court:string; date:string; treatment:string; tone:Tone; excerpt:string; note:string };
 type CorpusDocument = { title:string; citation:string|null; published_at:string|null; canonical_url:string|null; jurisdiction_code:string; document_type:string };
-type CorpusPolicy = { name:string; policy_state:string; sync_enabled:boolean; last_synced_at:string|null; license_name:string|null };
-type DemoIdentity = { access_token:string; user:{ id:string; email?:string }; role:string };
+type CorpusPolicy = { name:string; jurisdiction_code:string|null; policy_state:string; sync_enabled:boolean; last_synced_at:string|null; license_name:string|null };
+type VaultDocument = { id:string; title:string; file_name:string|null; status:string; created_at:string; size_bytes:number|null };
+type DemoIdentity = { access_token:string; user:{ id:string; email?:string }; role:string; organization_id:string };
+type CorpusStats = { TZ:number; UK:number; EU:number; queued:number };
 
 const SUPABASE_URL = "https://ylkntvwvqzzmwstjejei.supabase.co";
 const SUPABASE_KEY = "sb_publishable_qtlCHqeWzU-h_bfszdlb2g_P8_o-fXc";
@@ -39,7 +41,7 @@ const primary = [
   ["review","Review",ClipboardCheck],["tables","Tables",Table2],["lists","Lists",ListChecks],
 ] as const;
 const context = [["matters","Matters",BriefcaseBusiness],["vault","Vault",FolderLock]] as const;
-const intelligence = [["agent","Agent",Bot],["skills","Skills",Sparkles],["workflows","Workflows",Workflow],["monitor","Monitor",Activity]] as const;
+const intelligence = [["agent","Agent",Bot],["skills","Skills",Sparkles],["workflows","Workflows",Workflow],["monitor","Monitor",Activity],["trust","Trust",ShieldCheck]] as const;
 const allNav = [...primary,...context,...intelligence];
 
 const sources:Source[] = [
@@ -87,10 +89,19 @@ function SourceViewer({source,onClose}:{source:Source;onClose?:()=>void}) {
   </aside>;
 }
 
-function Research({source,setSource}:{source:Source;setSource:(s:Source)=>void}) {
+function Research({source,setSource,identity,connect}:{source:Source;setSource:(s:Source)=>void;identity:DemoIdentity|null;connect:()=>void}) {
   const [query,setQuery]=useState("What makes a termination unfair under Tanzanian employment law?");
-  const [running,setRunning]=useState(false);
-  const run=()=>{setRunning(true);setTimeout(()=>{setRunning(false);toast.success("Research completed",{description:"4 authorities checked across legislation and case law."})},1200)};
+  const [running,setRunning]=useState(false),[liveAnswer,setLiveAnswer]=useState<string|null>(null),[provider,setProvider]=useState<string|null>(null);
+  const run=async()=>{
+    if(!identity){connect();toast("Connect the test organization to run live research.");return;}
+    setRunning(true);setLiveAnswer(null);
+    try{
+      const response=await fetch(SUPABASE_URL+"/functions/v1/legal-api",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":"application/json"},body:JSON.stringify({action:"research",query,jurisdictions:["TZ","UK","EU"],organization_id:identity.organization_id,use_firm_knowledge:true,data_classification:"confidential"})});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data?.error||"Research request failed");
+      setLiveAnswer(data.answer);setProvider(data.provider);toast.success("Live research completed",{description:`${data.evidenceCount||0} verified passages retrieved.`});
+    }catch(error){toast.error(error instanceof Error?error.message:"Research failed")}finally{setRunning(false)}
+  };
   return <div className="research-page">
     <div className="research-bar"><Search/><Input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&run()}/><ToneBadge tone="blue">TZ</ToneBadge><Button size="sm" onClick={run}>{running?"Checking…":"Research"}</Button></div>
     <div className="research-grid">
@@ -99,8 +110,9 @@ function Research({source,setSource}:{source:Source;setSource:(s:Source)=>void})
         <div className="plan-block"><span className="eyebrow">Searches</span>{["statutory test for unfair termination","procedural fairness labour revision","burden of proof employer","prejudice exception dismissal"].map((x,i)=><div className="plan-step" key={x}><i>{i+1}</i><span>{x}</span><Check/></div>)}</div>
         <div className="plan-block"><div className="row spread"><span className="eyebrow">Authority set</span><small>4</small></div>{sources.map(s=><button className={"authority-mini "+(source.id===s.id?"active":"")} key={s.id} onClick={()=>setSource(s)}><span>{s.title}</span><small>{s.citation}</small></button>)}</div>
       </aside>
-      <article className="answer-pane"><div className="answer-head"><div><span className="eyebrow">Sample answer</span><span className="verified"><ShieldCheck/> Demonstration record</span></div><Button variant="ghost" size="sm">Save</Button></div>
+      <article className="answer-pane"><div className="answer-head"><div><span className="eyebrow">{liveAnswer?"Live answer":"Sample answer"}</span><span className="verified"><ShieldCheck/> {liveAnswer?`${provider} · governed request`:"Demonstration record"}</span></div><Button variant="ghost" size="sm">Save</Button></div>
         <div className="answer-content">
+          {liveAnswer&&<div className="live-answer"><span>Live research gateway</span><p>{liveAnswer}</p></div>}
           <h2>Fair termination requires both a valid reason and a fair process.</h2>
           <p className="standfirst">Under Tanzanian law, an employer must prove substantive justification and procedural fairness. Failure on either limb may render termination unfair.</p>
           <h3>Short answer</h3><p>Section 37 of the Employment and Labour Relations Act places the burden on the employer to establish a valid and fair reason connected to conduct, capacity, compatibility or operational requirements, and to show that a fair procedure was followed. <Citation n={1} onClick={()=>setSource(sources[0])}/></p>
@@ -163,12 +175,13 @@ function ListsView({show}:{show:()=>void}) {
   return <div className="view-pad"><Header title="Closing · Project Kilimanjaro" meta="Conditions, owners and supporting clauses stay connected." action={<Button><Plus/> Add item</Button>}/><div className="list-summary"><div><span>Completion</span><b>1 / 5</b></div><Progress value={20}/><small>Target closing · 18 September 2026</small></div><div className="checklist"><Table><TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Source</TableHead><TableHead>Owner</TableHead><TableHead>Status</TableHead><TableHead>Due</TableHead></TableRow></TableHeader><TableBody>{rows.map((r,i)=><TableRow key={r[0]}><TableCell><b>{r[0]}</b></TableCell><TableCell><button className="source-link" onClick={show}>{r[1]} <BookOpen/></button></TableCell><TableCell><i>{r[2].slice(0,2).toUpperCase()}</i>{r[2]}</TableCell><TableCell><ToneBadge tone={r[3]==="Complete"?"green":r[3]==="Blocked"?"red":r[3]==="In progress"?"blue":"neutral"}>{r[3]}</ToneBadge></TableCell><TableCell>{i<2?"6 Sep":i<4?"12 Sep":"14 Sep"}</TableCell></TableRow>)}</TableBody></Table></div></div>;
 }
 
-function MonitorView({documents,policies,total}:{documents:CorpusDocument[];policies:CorpusPolicy[];total:number}) {
+function MonitorView({documents,policies,total,stats}:{documents:CorpusDocument[];policies:CorpusPolicy[];total:number;stats:CorpusStats}) {
   const policyTone=(state:string):Tone=>state==="approved"?"green":state==="api_key_required"?"blue":state==="license_required"?"amber":"neutral";
   const policyLabel=(policy:CorpusPolicy)=>policy.policy_state==="approved"?(policy.last_synced_at?"Active":"Ready"):policy.policy_state.replaceAll("_"," ");
   return <div className="view-pad"><Header title="Monitor" meta="Licensed source changes with provenance, policy gates and impact review." action={<Button><Plus/> New monitor</Button>}/>
+    <div className="corpus-strip">{[["Tanzania",stats.TZ,"Official OAG"],["United Kingdom",stats.UK,"OGL v3"],["European Union",stats.EU,"EUR-Lex"],["Processing queue",stats.queued,"Structured fetch / parse"]].map(([label,value,note],i)=><div key={label}><i>{i<3?<Globe2/>:<Network/>}</i><span><small>{label}</small><b>{Number(value).toLocaleString()}</b><em>{note}</em></span></div>)}</div>
     <div className="corpus-ops"><div><span className="eyebrow">Corpus operations</span><b>Policy-gated ingestion</b><p>Connectors can only perform capabilities approved in the source registry.</p></div>{policies.map(p=><div key={p.name}><span>{p.name}</span><ToneBadge tone={policyTone(p.policy_state)}>{policyLabel(p)}</ToneBadge><small>{p.license_name||"Rights review pending"}</small></div>)}</div>
-    <div className="monitor-grid"><aside>{["Latest official legislation","Tanzania financial services","East Africa data protection","OHADA corporate law"].map((x,i)=><button className={i===0?"active":""} key={x}><Activity/><span>{x}<small>{i===0?`${total.toLocaleString()} records`:"connector gated"}</small></span></button>)}</aside><section>{documents.length?documents.map((r,i)=><article key={r.canonical_url||r.title}><time>{r.published_at?new Intl.DateTimeFormat("en",{day:"numeric",month:"short"}).format(new Date(r.published_at)):"Current"}</time><div><header><i>{r.jurisdiction_code}</i><span><small>Official source</small><b>{r.jurisdiction_code==="TZ"?"Tanzania OAG":"UK Legislation"}</b></span><ToneBadge tone={i===0?"blue":"green"}>{i===0?"Latest":"Ingested"}</ToneBadge></header><h2>{r.title}</h2><div className="impact"><span>{r.document_type.replaceAll("_"," ")}</span><p>{r.citation||"Official citation pending normalization"} · official PDF retrieval and structural parsing queued.</p></div><footer><Button variant="outline" onClick={()=>r.canonical_url&&window.open(r.canonical_url,"_blank","noopener,noreferrer")}>Open official source</Button><Button variant="outline" onClick={()=>toast("Impact analysis activates after the configured Docling and AI processing services complete.")}>Run impact analysis</Button><Button variant="ghost" onClick={()=>toast("Client matching requires an authenticated firm workspace.")}>Find clients</Button></footer></div></article>):<div className="empty-live"><ShieldCheck/><h2>No approved source records yet</h2><p>The connector will surface documents here after a licensed sync.</p></div>}</section></div></div>;
+    <div className="monitor-grid"><aside>{["Latest official legislation","Tanzania financial services","EU regulatory change","East Africa data protection","OHADA corporate law"].map((x,i)=><button className={i===0?"active":""} key={x}><Activity/><span>{x}<small>{i===0?`${total.toLocaleString()} records`:i===2?`${stats.EU.toLocaleString()} governed records`:"connector gated"}</small></span></button>)}</aside><section>{documents.length?documents.map((r,i)=><article key={r.canonical_url||r.title}><time>{r.published_at?new Intl.DateTimeFormat("en",{day:"numeric",month:"short"}).format(new Date(r.published_at)):"Current"}</time><div><header><i>{r.jurisdiction_code}</i><span><small>Official source</small><b>{r.jurisdiction_code==="TZ"?"Tanzania OAG":r.jurisdiction_code==="EU"?"EUR-Lex":"UK Legislation"}</b></span><ToneBadge tone={i===0?"blue":"green"}>{i===0?"Latest":"Ingested"}</ToneBadge></header><h2>{r.title}</h2><div className="impact"><span>{r.document_type.replaceAll("_"," ")}</span><p>{r.citation||"Official citation pending normalization"} · structured processing retains the source and rights record.</p></div><footer><Button variant="outline" onClick={()=>r.canonical_url&&window.open(r.canonical_url,"_blank","noopener,noreferrer")}>Open official source</Button><Button variant="outline" onClick={()=>toast("Impact analysis activates after the configured processing and AI services complete.")}>Run impact analysis</Button><Button variant="ghost" onClick={()=>toast("Client matching requires an authenticated firm workspace.")}>Find clients</Button></footer></div></article>):<div className="empty-live"><ShieldCheck/><h2>No approved source records yet</h2><p>The connector will surface documents here after a licensed sync.</p></div>}</section></div></div>;
 }
 
 function WorkflowView() {
@@ -182,8 +195,39 @@ function MattersView() {
   const rows=[["Project Kilimanjaro","M&A","Tanzania · UK","18 members","Active"],["Kibo Employment Review","Employment","Tanzania","6 members","Active"],["Mawingu Financing","Banking","Kenya · Tanzania","11 members","Active"],["Victoria Data Programme","Privacy","East Africa · EU","8 members","On hold"]];
   return <div className="view-pad"><Header title="Matters" meta="The secure context shared by people, documents, research and agents." action={<Button><Plus/> New matter</Button>}/><div className="matter-grid">{rows.map((r,i)=><button key={r[0]}><i>{String(i+1).padStart(2,"0")}</i><div><ToneBadge tone={i===3?"neutral":"green"}>{r[4]}</ToneBadge><h2>{r[0]}</h2><p>{r[1]}</p><small><Globe2/>{r[2]} <LockKeyhole/>{r[3]}</small></div><ChevronRight/></button>)}</div></div>;
 }
-function VaultView() {
-  return <div className="view-pad"><Header title="Vault" meta="Private documents stay isolated by organization, matter and document permission." action={<Button onClick={()=>toast("Upload ready",{description:"PDF, DOCX, XLSX, PPTX, HTML, images and TXT are supported."})}><Upload/> Upload</Button>}/><div className="vault-grid"><section>{[["Project Kilimanjaro",287],["Firm precedents",94],["Playbooks",18],["Client correspondence",126]].map(x=><button key={x[0]}><i><FolderLock/></i><span><b>{x[0]}</b><small>{x[1]} documents</small></span><ChevronRight/></button>)}</section><aside><ShieldCheck/><h2>Private Firm Intelligence</h2><p>Client content is permission-filtered before retrieval. Public and firm graphs stay separate and every agent action is auditable.</p>{[["Encryption","In transit & at rest"],["Data boundary","Organization + matter"],["Model training","Disabled for private data"]].map(x=><div key={x[0]}><span>{x[0]}</span><b>{x[1]}</b></div>)}</aside></div></div>;
+function VaultView({identity,documents,connect,refresh}:{identity:DemoIdentity|null;documents:VaultDocument[];connect:()=>void;refresh:()=>void}) {
+  const input=useRef<HTMLInputElement>(null),[uploading,setUploading]=useState(false);
+  const upload=async(file?:File)=>{
+    if(!file)return;
+    if(!identity){connect();toast("Connect the test organization before uploading.");return;}
+    setUploading(true);
+    try{
+      const safeName=file.name.replace(/[^a-zA-Z0-9._-]+/g,"-");
+      const storagePath=`${identity.organization_id}/${crypto.randomUUID()}/${safeName}`;
+      const stored=await fetch(`${SUPABASE_URL}/storage/v1/object/firm-vault/${storagePath.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":file.type||"application/octet-stream","x-upsert":"false"},body:file});
+      if(!stored.ok)throw new Error((await stored.json().catch(()=>null))?.message||"Secure upload failed");
+      const created=await fetch(SUPABASE_URL+"/rest/v1/documents",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({organization_id:identity.organization_id,title:file.name.replace(/\.[^.]+$/,""),file_name:file.name,mime_type:file.type||null,storage_path:storagePath,size_bytes:file.size,status:"uploaded",jurisdiction_codes:["TZ"],uploaded_by:identity.user.id,metadata:{upload_channel:"legal-eye-web",classification:"confidential"}})});
+      const rows=await created.json();
+      if(!created.ok||!rows?.[0])throw new Error(rows?.message||"Document record could not be created");
+      const process=await fetch(SUPABASE_URL+"/functions/v1/legal-process-document",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":"application/json"},body:JSON.stringify({document_id:rows[0].id})});
+      const job=await process.json().catch(()=>({}));
+      if(!process.ok)throw new Error(job?.error||"Document processing could not be queued");
+      toast.success("Document secured",{description:job.status==="queued"?"Parsing is queued until the private Docling worker is connected.":"Private parsing has started."});refresh();
+    }catch(error){toast.error(error instanceof Error?error.message:"Upload failed")}finally{setUploading(false);if(input.current)input.current.value=""}
+  };
+  const display=documents.length?documents.map(d=>[d.title,d.status,d.file_name||"Private document"]):[["Project Kilimanjaro","workspace","287 governed files"],["Firm precedents","library","94 approved precedents"],["Playbooks","library","18 versioned playbooks"],["Client correspondence","restricted","126 messages"]];
+  return <div className="view-pad"><Header title="Private knowledge" meta="Permission-filtered firm work, isolated from the public authority graph." action={<><input ref={input} hidden type="file" accept=".pdf,.docx,.xlsx,.txt" onChange={event=>upload(event.target.files?.[0])}/><Button onClick={()=>identity?input.current?.click():connect()} disabled={uploading}><Upload/> {uploading?"Securing…":"Upload"}</Button></>}/><div className="vault-grid"><section>{display.map(x=><button key={x[0]}><i><FolderLock/></i><span><b>{x[0]}</b><small>{x[1]} · {x[2]}</small></span><ChevronRight/></button>)}</section><aside><ShieldCheck/><h2>Private Firm Intelligence</h2><p>Client content is permission-filtered before retrieval. Public and firm graphs stay separate and every agent action is auditable.</p>{[["Encryption","Supabase storage · private bucket"],["Data boundary","Organization + matter RLS"],["Model training","Disabled for private data"],["Parser","Docling worker connection pending"]].map(x=><div key={x[0]}><span>{x[0]}</span><b>{x[1]}</b></div>)}</aside></div></div>;
+}
+function TrustView() {
+  const controls=[
+    ["Tenant isolation","Enforced","Organization, matter and document-level RLS",ShieldCheck,"green"],
+    ["AI data-loss prevention","Enforced","Credential blocking, identifier redaction and provider ceilings",Eye,"green"],
+    ["Audit trail","Active","Immutable product, ingestion and AI-generation events",FileClock,"green"],
+    ["SAML SSO","Configuration required","Provider registry exists; enterprise Supabase plan and IdP metadata required",KeyRound,"amber"],
+    ["SCIM 2.0","Endpoint ready","Token issuance and IdP conformance testing remain",Users,"blue"],
+    ["Customer-managed keys","Architecture ready","GCP KMS deployment and rotation evidence remain",Database,"amber"],
+  ] as const;
+  return <div className="trust-view"><div className="trust-hero"><span className="eyebrow">Enterprise control plane</span><h1>Trust is part of the work product.</h1><p>Every source, model call, permission decision and human approval should be reviewable without asking Legal Eye to explain itself.</p><div><Button><ShieldCheck/> Export control report</Button><Button variant="outline">Open evidence register</Button></div></div><div className="trust-layout"><section><div className="trust-heading"><span>Controls</span><small>live implementation state</small></div>{controls.map(([title,status,copy,Icon,tone])=><article className="control-row" key={title}><i><Icon/></i><div><b>{title}</b><p>{copy}</p></div><ToneBadge tone={tone}>{status}</ToneBadge><ChevronRight/></article>)}</section><aside><span className="eyebrow">Procurement readiness</span><h2>Enterprise evidence room</h2><p>Architecture is implemented; independent operational proof is still required before bank-production acceptance.</p>{[["Identity & access","3 / 5"],["Data protection","4 / 7"],["Application security","5 / 8"],["AI governance","4 / 7"],["Resilience","1 / 5"]].map(([name,value],i)=><div className="readiness" key={name}><span>{name}<b>{value}</b></span><Progress value={[60,57,63,57,20][i]}/></div>)}<footer><CircleAlert/><span>Open gates: external penetration test, disaster-recovery exercise, GCP KMS, SAML conformance and completed legal evaluation sets.</span></footer></aside></div></div>;
 }
 function ReviewView({show}:{show:()=>void}) {
   const rows=[["Change of control consent","Clause 11.4","High","Counterparty consent is required before completion and no deemed-consent mechanism is provided."],["Unlimited data protection indemnity","Clause 18.2","High","Liability is uncapped and sits outside the aggregate cap despite the firm playbook position."],["Missing materiality threshold","Warranty 7.1","Medium","The compliance warranty is absolute and not qualified by materiality or knowledge."],["Governing law inconsistency","Clause 27.1","Medium","English law is selected while the arbitration seat and mandatory approvals are Tanzanian."]];
@@ -191,25 +235,28 @@ function ReviewView({show}:{show:()=>void}) {
 }
 
 function LegalEye() {
-  const [view,setView]=useState<View>("research"), [source,setSource]=useState(sources[0]), [sourceOpen,setSourceOpen]=useState(false), [command,setCommand]=useState(false), [count,setCount]=useState(136), [documentCount,setDocumentCount]=useState(0), [liveDocuments,setLiveDocuments]=useState<CorpusDocument[]>([]), [corpusPolicies,setCorpusPolicies]=useState<CorpusPolicy[]>([]);
-  const [authOpen,setAuthOpen]=useState(false), [email,setEmail]=useState(""), [password,setPassword]=useState(""), [identity,setIdentity]=useState<DemoIdentity|null>(()=>{if(typeof window==="undefined")return null;try{const saved=sessionStorage.getItem("legal-eye-demo-session");return saved?JSON.parse(saved):null}catch{return null}}), [signingIn,setSigningIn]=useState(false);
+  const [view,setView]=useState<View>("research"), [source,setSource]=useState(sources[0]), [sourceOpen,setSourceOpen]=useState(false), [command,setCommand]=useState(false), [count,setCount]=useState(136), [documentCount,setDocumentCount]=useState(0), [liveDocuments,setLiveDocuments]=useState<CorpusDocument[]>([]), [corpusPolicies,setCorpusPolicies]=useState<CorpusPolicy[]>([]),[corpusStats,setCorpusStats]=useState<CorpusStats>({TZ:0,UK:0,EU:0,queued:0}),[vaultDocuments,setVaultDocuments]=useState<VaultDocument[]>([]);
+  const [authOpen,setAuthOpen]=useState(false), [email,setEmail]=useState(""), [password,setPassword]=useState(""), [identity,setIdentity]=useState<DemoIdentity|null>(()=>{if(typeof window==="undefined")return null;try{const saved=sessionStorage.getItem("legal-eye-demo-session");const parsed=saved?JSON.parse(saved):null;return parsed?.organization_id?parsed:null}catch{return null}}), [signingIn,setSigningIn]=useState(false);
+  const refreshVault=async(current=identity)=>{if(!current){setVaultDocuments([]);return;}const response=await fetch(SUPABASE_URL+"/rest/v1/documents?select=id,title,file_name,status,created_at,size_bytes&organization_id=eq."+current.organization_id+"&order=created_at.desc&limit=12",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+current.access_token}});if(response.ok)setVaultDocuments(await response.json())};
   const signIn=async()=>{
     setSigningIn(true);
     try{
       const response=await fetch(SUPABASE_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({email,password})});
       const data=await response.json();
       if(!response.ok) throw new Error(data?.error_description||data?.msg||"Sign in failed");
-      const membership=await fetch(SUPABASE_URL+`/rest/v1/organization_members?select=role&user_id=eq.${data.user.id}&is_active=is.true&limit=1`,{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+data.access_token}});
+      const membership=await fetch(SUPABASE_URL+`/rest/v1/organization_members?select=role,organization_id&user_id=eq.${data.user.id}&is_active=is.true&limit=1`,{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+data.access_token}});
       const memberships=membership.ok?await membership.json():[];
-      const next={access_token:data.access_token,user:data.user,role:memberships[0]?.role||"member"};
-      sessionStorage.setItem("legal-eye-demo-session",JSON.stringify(next));setIdentity(next);setPassword("");toast.success("Demo organization connected");
+      if(!memberships[0]?.organization_id)throw new Error("No active organization membership was found");
+      const next={access_token:data.access_token,user:data.user,role:memberships[0].role||"member",organization_id:memberships[0].organization_id};
+      sessionStorage.setItem("legal-eye-demo-session",JSON.stringify(next));setIdentity(next);setPassword("");setAuthOpen(false);await refreshVault(next);toast.success("Demo organization connected");
     }catch(error){toast.error(error instanceof Error?error.message:"Sign in failed")}finally{setSigningIn(false)}
   };
-  const signOut=()=>{sessionStorage.removeItem("legal-eye-demo-session");setIdentity(null);setAuthOpen(false);toast("Signed out")};
-  useEffect(()=>{const key=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setCommand(x=>!x)}};document.addEventListener("keydown",key);const headers={apikey:SUPABASE_KEY,Authorization:"Bearer "+SUPABASE_KEY,Prefer:"count=exact"};Promise.all([fetch(SUPABASE_URL+"/rest/v1/source_registry?select=id&limit=1",{headers}),fetch(SUPABASE_URL+"/rest/v1/legal_documents?select=title,citation,published_at,canonical_url,jurisdiction_code,document_type&order=published_at.desc.nullslast&limit=8",{headers}),fetch(SUPABASE_URL+"/rest/v1/source_registry?select=name,policy_state,sync_enabled,last_synced_at,license_name&adapter_key=in.(tz_oag,uk_legislation,eurlex,laws_africa,courtlistener)&order=name",{headers})]).then(async([sourceResponse,documentResponse,policyResponse])=>{const sourceRange=sourceResponse.headers.get("content-range"),documentRange=documentResponse.headers.get("content-range");if(sourceRange)setCount(Number(sourceRange.split("/")[1]));if(documentRange)setDocumentCount(Number(documentRange.split("/")[1]));if(documentResponse.ok)setLiveDocuments(await documentResponse.json());if(policyResponse.ok)setCorpusPolicies(await policyResponse.json())}).catch(()=>null);return()=>document.removeEventListener("keydown",key)},[]);
+  const signOut=()=>{sessionStorage.removeItem("legal-eye-demo-session");setIdentity(null);setVaultDocuments([]);setAuthOpen(false);toast("Signed out")};
+  useEffect(()=>{const key=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();setCommand(x=>!x)}};document.addEventListener("keydown",key);const headers={apikey:SUPABASE_KEY,Authorization:"Bearer "+SUPABASE_KEY,Prefer:"count=exact"};const counted=(path:string)=>fetch(SUPABASE_URL+path,{headers}).then(response=>Number(response.headers.get("content-range")?.split("/")[1]||0));Promise.all([fetch(SUPABASE_URL+"/rest/v1/source_registry?select=id&limit=1",{headers}),fetch(SUPABASE_URL+"/rest/v1/legal_documents?select=title,citation,published_at,canonical_url,jurisdiction_code,document_type&order=published_at.desc.nullslast&limit=12",{headers}),fetch(SUPABASE_URL+"/rest/v1/source_registry?select=name,jurisdiction_code,policy_state,sync_enabled,last_synced_at,license_name&adapter_key=in.(tz_oag,uk_legislation,eurlex,laws_africa,courtlistener,govinfo)&order=name",{headers}),counted("/rest/v1/legal_documents?select=id&jurisdiction_code=eq.TZ&limit=1"),counted("/rest/v1/legal_documents?select=id&jurisdiction_code=eq.UK&limit=1"),counted("/rest/v1/legal_documents?select=id&jurisdiction_code=eq.EU&limit=1"),counted("/rest/v1/ingestion_jobs?select=id&status=in.(queued,running)&limit=1")]).then(async([sourceResponse,documentResponse,policyResponse,tz,uk,eu,queued])=>{const sourceRange=(sourceResponse as Response).headers.get("content-range"),documentRange=(documentResponse as Response).headers.get("content-range");if(sourceRange)setCount(Number(sourceRange.split("/")[1]));if(documentRange)setDocumentCount(Number(documentRange.split("/")[1]));if((documentResponse as Response).ok)setLiveDocuments(await (documentResponse as Response).json());if((policyResponse as Response).ok)setCorpusPolicies(await (policyResponse as Response).json());setCorpusStats({TZ:tz as number,UK:uk as number,EU:eu as number,queued:queued as number})}).catch(()=>null);return()=>document.removeEventListener("keydown",key)},[]);
+  useEffect(()=>{if(!identity)return;const current=identity;fetch(SUPABASE_URL+"/rest/v1/documents?select=id,title,file_name,status,created_at,size_bytes&organization_id=eq."+current.organization_id+"&order=created_at.desc&limit=12",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+current.access_token}}).then(async response=>{if(response.ok)setVaultDocuments(await response.json())}).catch(()=>null)},[identity]);
   const title=useMemo(()=>allNav.find(x=>x[0]===view)?.[1]||"Research",[view]), go=(v:View)=>{setView(v);setCommand(false)}, show=()=>{setSource(sources[1]);setSourceOpen(true)};
-  const content=view==="research"?<Research source={source} setSource={setSource}/>:view==="ask"?<AskView go={()=>go("research")}/>:view==="draft"?<Draft show={show}/>:view==="tables"?<TablesView show={show}/>:view==="agent"?<AgentView/>:view==="skills"?<SkillsView/>:view==="lists"?<ListsView show={show}/>:view==="monitor"?<MonitorView documents={liveDocuments} policies={corpusPolicies} total={documentCount}/>:view==="workflows"?<WorkflowView/>:view==="matters"?<MattersView/>:view==="vault"?<VaultView/>:<ReviewView show={show}/>;
-  return <SidebarProvider defaultOpen style={{"--sidebar-width":"12.75rem","--sidebar-width-icon":"3.5rem"} as React.CSSProperties}>
+  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={()=>setAuthOpen(true)}/>:view==="ask"?<AskView go={()=>go("research")}/>:view==="draft"?<Draft show={show}/>:view==="tables"?<TablesView show={show}/>:view==="agent"?<AgentView/>:view==="skills"?<SkillsView/>:view==="lists"?<ListsView show={show}/>:view==="monitor"?<MonitorView documents={liveDocuments} policies={corpusPolicies} total={documentCount} stats={corpusStats}/>:view==="workflows"?<WorkflowView/>:view==="matters"?<MattersView/>:view==="vault"?<VaultView identity={identity} documents={vaultDocuments} connect={()=>setAuthOpen(true)} refresh={()=>void refreshVault()}/>:view==="trust"?<TrustView/>:<ReviewView show={show}/>;
+  return <SidebarProvider defaultOpen style={{"--sidebar-width":"11.75rem","--sidebar-width-icon":"3.35rem"} as React.CSSProperties}>
     <Sidebar collapsible="icon" className="legal-sidebar"><SidebarHeader className="brand-head"><span className="brand-mark">LE</span><span><b>Legal Eye</b><small>Global intelligence</small></span></SidebarHeader><SidebarContent>
       <Nav group={primary} view={view} go={go}/><Nav label="Context" group={context} view={view} go={go}/><Nav label="Intelligence" group={intelligence} view={view} go={go}/>
     </SidebarContent><SidebarFooter className="user-foot"><button onClick={()=>setAuthOpen(true)}><i>{identity?"DO":"DE"}</i><span><b>{identity?"Demo Owner":"Demo workspace"}</b><small>{identity?`${identity.role} · connected`:"Connect test organization"}</small></span><MoreHorizontal/></button></SidebarFooter></Sidebar>

@@ -37,6 +37,7 @@ async function service(path:string,init:RequestInit={}){
 }
 
 async function authenticate(auth:string){
+  if(auth===`Bearer ${S}`) return {id:null,service:true};
   const userResponse=await fetch(`${U}/auth/v1/user`,{headers:{apikey:A,authorization:auth}});
   if(!userResponse.ok) return null;
   const user=await userResponse.json();
@@ -120,6 +121,97 @@ async function ingestUkLegislation(source:any,runId:string,limit:number){
     }catch{rejected++;}
   }
   return {discovered:entries.length,fetched:entries.length,inserted,updated,rejected,cursor:{published_before:newest,page:1},feedHeaders:feed.headers};
+}
+
+async function fetchSparql(query:string){
+  const response=await fetch("https://publications.europa.eu/webapi/rdf/sparql",{
+    method:"POST",signal:AbortSignal.timeout(30000),headers:{
+      accept:"application/sparql-results+json",
+      "content-type":"application/x-www-form-urlencoded;charset=UTF-8",
+      "user-agent":"LegalEye/0.1 (governed EUR-Lex metadata connector; contact=truckai.co@gmail.com)",
+    },
+    body:new URLSearchParams({query,format:"application/sparql-results+json"}),
+  });
+  if(!response.ok) throw new Error(`CELLAR SPARQL returned ${response.status}`);
+  return {payload:await response.json(),headers:{etag:response.headers.get("etag"),last_modified:response.headers.get("last-modified")}};
+}
+
+function bindingValue(binding:any,key:string){
+  const value=binding?.[key]?.value;
+  return typeof value==="string"&&value.trim()?value.trim():null;
+}
+
+async function ingestEurLex(source:any,runId:string,limit:number){
+  const query=`PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+SELECT DISTINCT ?work ?celex ?date ?title ?resourceType WHERE {
+  ?work cdm:work_id_document ?celex ; cdm:work_date_document ?date .
+  OPTIONAL { ?work cdm:work_has_resource-type ?resourceType . }
+  OPTIONAL {
+    ?expression cdm:expression_belongs_to_work ?work ;
+      cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/ENG> ;
+      cdm:expression_title ?title .
+  }
+  FILTER(REGEX(STR(?celex), "^[0-9]"))
+}
+ORDER BY DESC(?date) DESC(?celex)
+LIMIT ${Math.min(Math.max(limit,1),500)}`;
+  const response=await fetchSparql(query);
+  const bindings=Array.isArray(response.payload?.results?.bindings)?response.payload.results.bindings:[];
+  const now=new Date().toISOString();
+  const existingRows=await service(`legal_documents?select=canonical_source_id&source_id=eq.${source.id}&limit=1000`);
+  const existing=new Set((existingRows||[]).map((row:any)=>String(row.canonical_source_id)));
+  const documents:any[]=[];
+  const objects:any[]=[];
+  const jobs:any[]=[];
+  let rejected=0;
+
+  for(const binding of bindings){
+    const celex=bindingValue(binding,"celex");
+    const work=bindingValue(binding,"work");
+    const date=bindingValue(binding,"date");
+    if(!celex||!work){rejected++;continue;}
+    const externalId=`celex:${celex}`;
+    const title=bindingValue(binding,"title")||`EU legal document ${celex}`;
+    const resourceType=bindingValue(binding,"resourceType");
+    const typeSlug=resourceType?.split("/").pop()?.toLowerCase().replaceAll("-","_")||"eu_legal_act";
+    const canonicalUrl=`https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:${encodeURIComponent(celex)}`;
+    const raw=JSON.stringify(binding);
+    const contentHash=await hash(raw);
+    documents.push({
+      source_id:source.id,canonical_source_id:externalId,canonical_url:canonicalUrl,jurisdiction_code:"EU",
+      document_type:typeSlug,title,citation:`CELEX ${celex}`,published_at:date,current_status:"published",
+      version_label:"official EUR-Lex expression",language:"en",
+      structured_content:{format:"CELLAR_RDF_METADATA",hierarchy_preserved:false,parser_state:"queued",work_uri:work},
+      content_hash:contentHash,retrieved_at:now,updated_at:now,
+      metadata:{source:"EUR-Lex / Publications Office of the European Union",work_uri:work,
+        attribution:source.attribution_text,licence:source.license_name,rights_check:"per-document exceptions required before publication"},
+    });
+    objects.push({
+      source_id:source.id,connector_run_id:runId,external_id:externalId,canonical_url:canonicalUrl,
+      media_type:"application/sparql-results+json",source_published_at:date,content_sha256:contentHash,
+      byte_size:new TextEncoder().encode(raw).byteLength,raw_content:raw,headers:response.headers,
+      provenance:{sparql_endpoint:"https://publications.europa.eu/webapi/rdf/sparql",work_uri:work,
+        retrieved_by:"legal-corpus-ingest",connector_version:"eurlex-cellar@1"},processing_state:"stored",
+    });
+    if(!existing.has(externalId)) jobs.push({
+      source_id:source.id,job_type:"eurlex_structured_fetch_parse",status:"queued",
+      payload:{external_id:externalId,celex,work_uri:work,canonical_url:canonicalUrl,jurisdiction_code:"EU",
+        parser:"cellar-rdf",preserve_structure:true,verify_item_rights:true},
+    });
+  }
+
+  for(const group of batches(documents)) await service("legal_documents?on_conflict=source_id,canonical_source_id",{
+    method:"POST",headers:{"content-type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(group),
+  });
+  for(const group of batches(objects)) await service("source_ingest_objects?on_conflict=source_id,external_id,content_sha256",{
+    method:"POST",headers:{"content-type":"application/json",Prefer:"resolution=ignore-duplicates,return=minimal"},body:JSON.stringify(group),
+  });
+  for(const group of batches(jobs)) await service("ingestion_jobs",{
+    method:"POST",headers:{"content-type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(group),
+  });
+  return {discovered:bindings.length,fetched:1,inserted:documents.filter(x=>!existing.has(x.canonical_source_id)).length,
+    updated:documents.filter(x=>existing.has(x.canonical_source_id)).length,rejected,queued:jobs.length,
+    cursor:{published_before:documents[0]?.published_at||null,celex_before:documents[0]?.citation||null},feedHeaders:response.headers};
 }
 
 type OagCollection={
@@ -242,8 +334,9 @@ Deno.serve(async(request)=>{
     const input=await request.json();
     const adapter=String(input.adapter||"");
     const mode=String(input.mode||"incremental_sync");
-    const limit=Math.min(Math.max(Number(input.limit||10),1),20);
-    if(!["uk_legislation","tz_oag"].includes(adapter)) return json({error:"Connector is not enabled"},400);
+    const requestedLimit=Math.max(Number(input.limit||10),1);
+    const limit=adapter==="eurlex"?Math.min(requestedLimit,500):Math.min(requestedLimit,20);
+    if(!["uk_legislation","tz_oag","eurlex"].includes(adapter)) return json({error:"Connector is not enabled"},400);
     const rows=await service(`source_registry?select=*&adapter_key=eq.${encodeURIComponent(adapter)}`);
     const source=rows?.[0];
     if(!source) return json({error:"Source registry entry not found"},404);
@@ -251,13 +344,13 @@ Deno.serve(async(request)=>{
     const allowed=await service(`rpc/source_capability_allowed`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({p_source_id:source.id,p_capability:capability})});
     if(allowed!==true) return json({error:"Source policy gate denied this operation",source:source.name,capability},403);
 
-    const connectorVersion=adapter==="tz_oag"?"tz-oag@1":"uk-legislation@1";
+    const connectorVersion=adapter==="tz_oag"?"tz-oag@1":adapter==="eurlex"?"eurlex-cellar@1":"uk-legislation@1";
     const runs=await service("connector_runs",{method:"POST",headers:{"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({
       source_id:source.id,connector_version:connectorVersion,mode,status:"running",requested_by:user.id,
       started_at:new Date().toISOString(),policy_snapshot:{policy_state:source.policy_state,capability,licence:source.license_name,reviewed_at:source.last_legal_review},
     })});
     runId=runs[0].id;
-    const result=adapter==="tz_oag"?await ingestTanzaniaOag(source,runId):await ingestUkLegislation(source,runId,limit);
+    const result=adapter==="tz_oag"?await ingestTanzaniaOag(source,runId):adapter==="eurlex"?await ingestEurLex(source,runId,limit):await ingestUkLegislation(source,runId,limit);
     await service(`connector_runs?id=eq.${runId}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({
       status:result.rejected?"partial":"succeeded",discovered_count:result.discovered,fetched_count:result.fetched,
       inserted_count:result.inserted,updated_count:result.updated,rejected_count:result.rejected,

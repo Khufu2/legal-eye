@@ -16,7 +16,10 @@ bulk ingest, embedding, computational analysis, redistribution and attribution.
   third-party rights and required attribution. Twenty current official metadata records have been
   ingested with source URLs, hashes, provenance and an evaluation case for each record.
 - EUR-Lex is approved under its official reuse policy, subject to per-document notices and excluded
-  third-party material. Its connector has not yet been activated.
+  third-party material. The CELLAR knowledge-graph connector is active and the first governed sync
+  captured 250 recent EU legal-document records with CELEX identifiers, official work URIs,
+  provenance and hashes. Structured-content jobs are queued; each item must pass its own rights
+  exception check before full text is published.
 - Laws.Africa is discovery-only in this commercial product until a commercial Content API agreement
   is executed; open content is CC BY-NC-SA and cannot be assumed commercially reusable.
 - CourtListener requires an API token and approved quota/terms. No scraping fallback is permitted.
