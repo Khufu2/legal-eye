@@ -1,6 +1,6 @@
 # Legal Eye production gap audit
 
-Audit date: **2026-09-04**. Target: a defensible enterprise legal-intelligence product suitable
+Audit date: **2026-09-07**. Target: a defensible enterprise legal-intelligence product suitable
 for a global bank or top-tier firm. This audit separates implemented foundations from operationally
 proven capabilities. A screen or database table does not count as a working product capability.
 
@@ -19,7 +19,7 @@ organization and owner exist; real client matters and firm work product do not.
 | --- | --- | --- |
 | Premium connected UI | Research, Editor, Review, Tables, Agent, Skills, Workflows, Lists, Matters, Vault and Monitor interaction prototype | Real authentication/session, database-backed mutations, permissions-aware states, accessibility/browser QA, telemetry and error recovery |
 | OpenContracts | Audited MIT commit, adapter contract and Cloud Build boundary | Running API/workers, dedicated database/Redis, tenant adapter, migrations, health/load/contract tests and upstream security hardening |
-| Docling | Private parser service source with format, size, provenance and non-root controls | Deployed private image, malware gate, model artifact management, object storage, processing queue, golden legal-document suite and load tests |
+| Docling | Private parser service plus a bounded queue worker with policy recheck, host/MIME/signature limits, mandatory malware-scanner gate, leases, heartbeat, retry/dead-letter handling, canonical artifacts and exact-span chunk mapping | Apply the migration, deploy the signed private image and scanner, drain a controlled batch, then complete golden-document, load and recovery tests |
 | LangGraph | Inspectable plan/execute/review/deliver service with human checkpoint | Running service, durable queue/retry/idempotency, token exchange, cancellation, failure injection, observability and recovery drills |
 | Public corpus | 136 registered sources; Tanzania OAG, UK and EUR-Lex policy-approved; 5,765 governed metadata records | Completed PDF retrieval, structural CLML/AKN/CELLAR parsing, cases, courts, citations, versions, amendments, authority treatment, embeddings and reconciliation |
 | African moat | 5,495 official Tanzania OAG catalogue records, 30 jurisdictions and 12 parser plug-in registrations | Process the queued PDFs, ingest judgments/Gazettes, build court hierarchy, citation fixtures, treatment graph and lawyer QA |
@@ -54,6 +54,19 @@ organization and owner exist; real client matters and firm work product do not.
   compilation and repository secret scan. Dependency upgrades removed all high-severity npm
   findings; four moderate development-only findings remain through Drizzle Kit's legacy esbuild
   loader and require an upstream-safe migration rather than a forced downgrade.
+
+## 2026-09-07 verification delta
+
+- A read-only public Data API check reconfirmed 5,495 Tanzania, 20 UK and 250 EU catalogue records
+  (5,765 total) and zero publicly readable `document_chunks`, `authorities` and `citation_edges`.
+- Anonymous access correctly cannot establish the privileged ingestion queue count. A connected
+  Supabase operator session is still required to verify queued, leased, failed and dead-letter totals
+  and to run the database security/performance advisors.
+- Durable Docling worker and schema changes are implemented in source but are **not operational
+  evidence** until the migration and Edge Function are deployed and a controlled parsed batch is
+  inspected in the live database.
+- No GCP project/runtime credentials or malware-scanner endpoint were available in this checkout;
+  the worker therefore remains intentionally undeployed and fail-closed.
 
 ## Critical path
 

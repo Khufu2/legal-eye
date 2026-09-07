@@ -17,3 +17,27 @@ Required runtime controls:
 
 The Docker base and Python dependencies are pinned. Production image promotion also requires SBOM generation, vulnerability scanning, signature verification and the golden legal-document regression suite.
 
+## Durable queue worker
+
+The same image can run a bounded Cloud Run Job by overriding its command:
+
+```text
+python worker.py --limit 5 --job-types official_pdf_fetch_parse,docling_parse
+```
+
+Required secrets and configuration are `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, and
+`MALWARE_SCANNER_URL`; an optional `MALWARE_SCANNER_TOKEN` authenticates the scanner. The worker
+refuses to claim jobs if scanning is not configured. It claims work atomically with `SKIP LOCKED`,
+heartbeats a time-bounded lease, retries with exponential backoff, and dead-letters exhausted or
+non-retryable jobs.
+
+Public documents are fetched only from the approved source-registry host after the current licence
+capabilities are checked. Redirects, private addresses, invalid MIME/signatures, oversized files,
+and malware findings fail closed. Canonical Docling JSON is stored in the private
+`legal-corpus-artifacts` bucket; derived chunks retain the Docling node reference, reading order,
+page, coordinates, offsets, extraction confidence, and OCR provenance. Private Vault documents use
+the same controls and remain organization-scoped in `firm-vault`.
+
+Until this job is deployed with all required secrets, uploads and corpus records remain queued and
+must be shown as not searchable.
+

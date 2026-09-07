@@ -1,181 +1,184 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const U = Deno.env.get("SUPABASE_URL")!;
-const A = Deno.env.get("SUPABASE_ANON_KEY")!;
-const S = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DOCLING_URL = Deno.env.get("DOCLING_SERVICE_URL")?.replace(/\/$/, "");
-const PARSER_KEY = Deno.env.get("LEGAL_EYE_PARSER_KEY");
+function bundledKey(name: string) {
+  const raw = Deno.env.get(name);
+  if (!raw) return "";
+  try {
+    const values = JSON.parse(raw) as Record<string, unknown>;
+    const candidate = values.default || Object.values(values).find((value) => typeof value === "string");
+    return typeof candidate === "string" ? candidate : "";
+  } catch {
+    return "";
+  }
+}
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-};
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+const U = Deno.env.get("SUPABASE_URL")!;
+const A = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || bundledKey("SUPABASE_PUBLISHABLE_KEYS") ||
+  Deno.env.get("SUPABASE_ANON_KEY")!;
+const S = Deno.env.get("SUPABASE_SECRET_KEY") || bundledKey("SUPABASE_SECRET_KEYS") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+if (!U || !A || !S) throw new Error("Supabase runtime configuration is incomplete");
+const DEFAULT_ORIGIN = "https://legal-eye.truckai-co.chatgpt.site";
+const ALLOWED_ORIGINS = new Set(
+  (Deno.env.get("ALLOWED_WEB_ORIGINS") || DEFAULT_ORIGIN)
+    .split(",")
+    .map((value: string) => value.trim())
+    .filter(Boolean),
+);
+
+function cors(request: Request) {
+  const origin = request.headers.get("origin");
+  return {
+    ...(origin && ALLOWED_ORIGINS.has(origin) ? { "Access-Control-Allow-Origin": origin } : {}),
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST,OPTIONS",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
+
+const json = (request: Request, body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
-  headers: { ...cors, "content-type": "application/json" },
+  headers: { ...cors(request), "content-type": "application/json" },
 });
-const pathEncode = (value: string) => value.split("/").map(encodeURIComponent).join("/");
+
 const serviceHeaders = (extra: Record<string, string> = {}) => ({
   apikey: S,
-  authorization: `Bearer ${S}`,
+  ...(!S.startsWith("sb_") ? { authorization: `Bearer ${S}` } : {}),
   ...extra,
 });
 
 async function service(path: string, init: RequestInit = {}) {
-  return fetch(`${U}${path}`, { ...init, headers: serviceHeaders(init.headers as Record<string, string> || {}) });
+  const response = await fetch(`${U}${path}`, {
+    ...init,
+    headers: serviceHeaders(init.headers as Record<string, string> || {}),
+  });
+  const text = await response.text();
+  const body = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    const error = new Error(body?.message || body?.error || `Database operation failed (${response.status})`);
+    Object.assign(error, { status: response.status, body });
+    throw error;
+  }
+  return body;
 }
 
 async function patchDocument(id: string, values: Record<string, unknown>) {
-  const response = await service(`/rest/v1/documents?id=eq.${encodeURIComponent(id)}`, {
+  await service(`/rest/v1/documents?id=eq.${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(values),
   });
-  if (!response.ok) throw new Error("Could not update document state");
 }
 
-Deno.serve(async (request) => {
-  if (request.method === "OPTIONS") return new Response(null, { headers: cors });
-  if (request.method !== "POST") return json({ error: "POST required" }, 405);
+Deno.serve(async (request: Request) => {
+  if (request.method === "OPTIONS") {
+    const origin = request.headers.get("origin");
+    if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+    return new Response(null, { headers: cors(request) });
+  }
+  if (request.method !== "POST") return json(request, { error: "POST required" }, 405);
+
+  const origin = request.headers.get("origin");
+  if (origin && !ALLOWED_ORIGINS.has(origin)) return json(request, { error: "Origin not allowed" }, 403);
 
   const authorization = request.headers.get("authorization") || "";
-  if (!authorization.startsWith("Bearer ")) return json({ error: "Authentication required" }, 401);
+  if (!authorization.startsWith("Bearer ")) return json(request, { error: "Authentication required" }, 401);
 
-  let documentId: string | undefined;
-  let jobId: string | undefined;
   try {
-    const body = await request.json();
-    documentId = body?.document_id;
-    if (!documentId) return json({ error: "document_id required" }, 400);
+    const input = await request.json().catch(() => null);
+    const documentId = typeof input?.document_id === "string" ? input.document_id : "";
+    if (!documentId) return json(request, { error: "document_id required" }, 400);
 
     const visible = await fetch(
-      `${U}/rest/v1/documents?id=eq.${encodeURIComponent(documentId)}&select=id,organization_id,storage_path,mime_type,file_name,status,metadata`,
+      `${U}/rest/v1/documents?id=eq.${encodeURIComponent(documentId)}&select=id,organization_id,storage_path,mime_type,file_name,status,metadata,content_hash`,
       { headers: { apikey: A, authorization } },
     );
-    const rows = await visible.json();
-    if (!visible.ok || !rows?.length) return json({ error: "Document not found or not authorized" }, 403);
-    const document = rows[0];
-    if (!document.storage_path) return json({ error: "Document has no source object" }, 409);
+    const rows = await visible.json().catch(() => []);
+    if (!visible.ok || !rows?.length) {
+      return json(request, { error: "Document not found or not authorized" }, 403);
+    }
 
-    const queued = await service("/rest/v1/ingestion_jobs", {
+    const document = rows[0];
+    if (!document.storage_path) return json(request, { error: "Document has no source object" }, 409);
+
+    const sourceVersion = document.content_hash || document.storage_path;
+    const idempotencyKey = `private-docling:${document.id}:${sourceVersion}`;
+    const existing = await service(
+      `/rest/v1/ingestion_jobs?idempotency_key=eq.${encodeURIComponent(idempotencyKey)}` +
+        "&select=id,status,attempt_count,max_attempts,available_at,dead_lettered_at&limit=1",
+    );
+    if (existing?.[0]) {
+      const job = existing[0];
+      return json(request, {
+        ok: true,
+        status: job.status,
+        job_id: job.id,
+        attempts: job.attempt_count,
+        max_attempts: job.max_attempts,
+        available_at: job.available_at,
+        dead_lettered: Boolean(job.dead_lettered_at),
+        duplicate: true,
+      }, job.status === "complete" ? 200 : 202);
+    }
+
+    const created = await service("/rest/v1/ingestion_jobs?on_conflict=idempotency_key", {
       method: "POST",
-      headers: { "content-type": "application/json", Prefer: "return=representation" },
+      headers: { "content-type": "application/json", Prefer: "resolution=ignore-duplicates,return=representation" },
       body: JSON.stringify({
         document_id: document.id,
         organization_id: document.organization_id,
         job_type: "docling_parse",
-        status: DOCLING_URL && PARSER_KEY ? "running" : "queued",
-        progress: DOCLING_URL && PARSER_KEY ? 0.1 : 0,
-        started_at: DOCLING_URL && PARSER_KEY ? new Date().toISOString() : null,
-        payload: { engine: "docling", canonical_format: "docling-json", structure_required: true },
-      }),
-    });
-    if (!queued.ok) throw new Error("Could not create ingestion job");
-    jobId = (await queued.json())[0]?.id;
-
-    if (!DOCLING_URL || !PARSER_KEY) {
-      await patchDocument(document.id, {
-        metadata: { ...document.metadata, parser: "docling", parser_state: "queued", ingestion_job_id: jobId },
-        updated_at: new Date().toISOString(),
-      });
-      return json({ ok: true, status: "queued", job_id: jobId, engine: "docling" }, 202);
-    }
-
-    await patchDocument(document.id, {
-      status: "parsing",
-      metadata: { ...document.metadata, parser: "docling", parser_state: "running", ingestion_job_id: jobId },
-      updated_at: new Date().toISOString(),
-    });
-
-    const source = await service(`/storage/v1/object/firm-vault/${pathEncode(document.storage_path)}`);
-    if (!source.ok) throw new Error("Could not read source object");
-    const sourceBytes = await source.arrayBuffer();
-    const form = new FormData();
-    form.append("file", new Blob([sourceBytes], { type: document.mime_type || "application/octet-stream" }), document.file_name || "document");
-
-    const parsed = await fetch(`${DOCLING_URL}/v1/convert`, {
-      method: "POST",
-      headers: { "X-Legal-Eye-Parser-Key": PARSER_KEY },
-      body: form,
-    });
-    if (!parsed.ok) throw new Error(`Docling conversion failed with status ${parsed.status}`);
-    const canonical = await parsed.json();
-    if (!canonical?.document || canonical?.provenance?.canonical_format !== "docling-json") {
-      throw new Error("Parser returned an invalid canonical artifact");
-    }
-
-    const artifactBytes = new TextEncoder().encode(JSON.stringify(canonical));
-    const digest = await crypto.subtle.digest("SHA-256", artifactBytes);
-    const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    const artifactPath = `${document.organization_id}/.artifacts/${document.id}/${hash}.docling.json`;
-    const upload = await service(`/storage/v1/object/firm-vault/${pathEncode(artifactPath)}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-upsert": "true" },
-      body: artifactBytes,
-    });
-    if (!upload.ok) throw new Error("Could not store canonical parsing artifact");
-
-    const recorded = await service("/rest/v1/document_ingestion_artifacts", {
-      method: "POST",
-      headers: { "content-type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({
-        document_id: document.id,
-        ingestion_job_id: jobId,
-        artifact_type: "docling_json",
-        schema_version: canonical.schema || "legal-eye.docling-conversion.v1",
-        engine_name: canonical.engine?.name || "docling",
-        engine_version: canonical.engine?.version || "unknown",
-        content_hash: hash,
-        storage_path: artifactPath,
-        byte_size: artifactBytes.byteLength,
-        confidence: canonical.provenance?.confidence || {},
-        provenance: {
-          source: canonical.source,
-          timings: canonical.provenance?.timings || {},
-          elapsed_ms: canonical.elapsed_ms,
-        },
-        is_canonical: true,
-      }),
-    });
-    if (!recorded.ok) throw new Error("Could not record canonical parsing artifact");
-
-    await service(`/rest/v1/ingestion_jobs?id=eq.${encodeURIComponent(jobId!)}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status: "complete", progress: 1, completed_at: new Date().toISOString() }),
-    });
-    await service("/rest/v1/ingestion_jobs", {
-      method: "POST",
-      headers: { "content-type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({
-        document_id: document.id,
-        organization_id: document.organization_id,
-        job_type: "opencontracts_index",
         status: "queued",
-        payload: { source_artifact_hash: hash, source_artifact_path: artifactPath },
+        progress: 0,
+        idempotency_key: idempotencyKey,
+        available_at: new Date().toISOString(),
+        payload: {
+          engine: "docling",
+          canonical_format: "docling-json",
+          structure_required: true,
+          storage_bucket: "firm-vault",
+          storage_path: document.storage_path,
+          mime_type: document.mime_type,
+          file_name: document.file_name,
+        },
+      }),
+    });
+    const job = created?.[0] || (await service(
+      `/rest/v1/ingestion_jobs?idempotency_key=eq.${encodeURIComponent(idempotencyKey)}` +
+        "&select=id,status,attempt_count,max_attempts,available_at,dead_lettered_at&limit=1",
+    ))?.[0];
+    if (!job?.id) throw new Error("Could not create ingestion job");
+
+    await service("/rest/v1/ingestion_job_events", {
+      method: "POST",
+      headers: { "content-type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        ingestion_job_id: job.id,
+        organization_id: document.organization_id,
+        event_type: "queued",
+        detail: { engine: "docling", canonical_format: "docling-json" },
       }),
     });
     await patchDocument(document.id, {
-      status: "indexing",
-      content_hash: canonical.source?.sha256 || document.content_hash,
-      metadata: { ...document.metadata, parser: "docling", parser_state: "complete", canonical_artifact_hash: hash },
+      metadata: {
+        ...(document.metadata || {}),
+        parser: "docling",
+        parser_state: "queued",
+        ingestion_job_id: job.id,
+      },
       updated_at: new Date().toISOString(),
     });
-    return json({ ok: true, status: "indexing", job_id: jobId, artifact_hash: hash, engine: "docling" }, 202);
+
+    return json(request, {
+      ok: true,
+      status: "queued",
+      job_id: job.id,
+      engine: "docling",
+      searchable: false,
+    }, 202);
   } catch (error) {
-    console.error("document ingestion failed", error instanceof Error ? error.message : "unknown error");
-    if (jobId) {
-      await service(`/rest/v1/ingestion_jobs?id=eq.${encodeURIComponent(jobId)}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ status: "failed", error_message: error instanceof Error ? error.message : "Unknown error" }),
-      }).catch(() => undefined);
-    }
-    if (documentId) {
-      await patchDocument(documentId, { status: "failed", updated_at: new Date().toISOString() }).catch(() => undefined);
-    }
-    return json({ error: "Document ingestion failed", job_id: jobId }, 500);
+    console.error("document queueing failed", error instanceof Error ? error.message : "unknown error");
+    return json(request, { error: "Document processing could not be queued" }, 500);
   }
 });
-

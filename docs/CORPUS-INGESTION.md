@@ -40,3 +40,20 @@ bulk ingest, embedding, computational analysis, redistribution and attribution.
 Every run writes `connector_runs`, `source_sync_cursors` and `source_ingest_objects`. Retries must
 use ETag/Last-Modified and canonical IDs so that ingestion is idempotent. Failed or quarantined
 items never enter the public catalog.
+
+## Processing worker release boundary
+
+Migration `20260907121920_processing_queue_and_legal_chunks.sql` adds atomic leases, heartbeats,
+bounded attempts, exponential retry, dead-letter timestamps, idempotency keys and append-only job
+events. It also adds private canonical public-law artifacts and derived chunks with Docling node,
+page, coordinates, offsets, confidence and OCR provenance. The public RLS policy permits reads only
+when the governing source remains approved for commercial display.
+
+`services/docling/worker.py` is the bounded Cloud Run Job entry point. It rechecks source rights,
+restricts fetches to the approved HTTPS host, validates redirects, MIME/signatures and size, and
+requires a configured malware scanner before claiming work. It stores the canonical artifact before
+publishing chunks and marks a job complete only after all persistence succeeds.
+
+This code and migration do not mean the live queue has been drained. The worker image, scanner,
+Supabase secret, private networking and service identity must be deployed and a controlled batch
+must complete before any record is reported as searchable.

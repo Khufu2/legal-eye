@@ -38,6 +38,10 @@ and [production readiness](./docs/PRODUCTION-READINESS.md).
 
 Requirements: Node.js 22.13+ and the dependency lock in this repository.
 
+Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` plus
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from Supabase Dashboard → Connect. Do not put a secret or
+service-role key in a `NEXT_PUBLIC_` variable.
+
 ```bash
 npm run install:ci
 npm run build

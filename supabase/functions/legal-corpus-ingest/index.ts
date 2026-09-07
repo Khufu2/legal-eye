@@ -1,15 +1,33 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { XMLParser } from "npm:fast-xml-parser@5.2.5";
 
+function bundledKey(name:string){
+  const raw=Deno.env.get(name);
+  if(!raw) return "";
+  try{
+    const values=JSON.parse(raw) as Record<string,unknown>;
+    const candidate=values.default||Object.values(values).find(value=>typeof value==="string");
+    return typeof candidate==="string"?candidate:"";
+  }catch{return "";}
+}
+
 const U=Deno.env.get("SUPABASE_URL")!;
-const A=Deno.env.get("SUPABASE_ANON_KEY")!;
-const S=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const cors={
-  "Access-Control-Allow-Origin":"*",
-  "Access-Control-Allow-Headers":"authorization, apikey, content-type",
-  "Access-Control-Allow-Methods":"POST,OPTIONS",
+const A=Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||bundledKey("SUPABASE_PUBLISHABLE_KEYS")||Deno.env.get("SUPABASE_ANON_KEY")!;
+const S=Deno.env.get("SUPABASE_SECRET_KEY")||bundledKey("SUPABASE_SECRET_KEYS")||Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+if(!U||!A||!S) throw new Error("Supabase runtime configuration is incomplete");
+const DEFAULT_ORIGIN="https://legal-eye.truckai-co.chatgpt.site";
+const ALLOWED_ORIGINS=new Set((Deno.env.get("ALLOWED_WEB_ORIGINS")||DEFAULT_ORIGIN).split(",").map(value=>value.trim()).filter(Boolean));
+const cors=(request:Request)=>{
+  const origin=request.headers.get("origin");
+  return {
+    ...(origin&&ALLOWED_ORIGINS.has(origin)?{"Access-Control-Allow-Origin":origin}:{}),
+    "Access-Control-Allow-Headers":"authorization, apikey, content-type",
+    "Access-Control-Allow-Methods":"POST,OPTIONS",
+    "Access-Control-Max-Age":"86400",
+    Vary:"Origin",
+  };
 };
-const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,"content-type":"application/json"}});
+const json=(request:Request,body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors(request),"content-type":"application/json"}});
 const parser=new XMLParser({ignoreAttributes:false,attributeNamePrefix:"@_",removeNSPrefix:true,parseTagValue:false,trimValues:true});
 
 async function fetchText(url:string,accept:string){
@@ -26,7 +44,7 @@ async function hash(value:string){
 }
 
 function serviceHeaders(extra:Record<string,string>={}){
-  return {apikey:S,authorization:`Bearer ${S}`,...extra};
+  return {apikey:S,...(!S.startsWith("sb_")?{authorization:`Bearer ${S}`} : {}),...extra};
 }
 
 async function service(path:string,init:RequestInit={}){
@@ -36,8 +54,9 @@ async function service(path:string,init:RequestInit={}){
   return body?JSON.parse(body):null;
 }
 
-async function authenticate(auth:string){
-  if(auth===`Bearer ${S}`) return {id:null,service:true};
+async function authenticate(auth:string,apiKey:string){
+  if(apiKey===S||auth===`Bearer ${S}`) return {id:null,service:true};
+  if(!auth.startsWith("Bearer ")) return null;
   const userResponse=await fetch(`${U}/auth/v1/user`,{headers:{apikey:A,authorization:auth}});
   if(!userResponse.ok) return null;
   const user=await userResponse.json();
@@ -116,6 +135,7 @@ async function ingestUkLegislation(source:any,runId:string,limit:number){
       })});
       await service("ingestion_jobs",{method:"POST",headers:{"content-type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({
         source_id:source.id,job_type:"legal_xml_parse",status:"queued",
+        idempotency_key:`legal-xml:${source.id}:${externalId}:${contentHash}`,
         payload:{legal_document_id:legalDocumentId,format:"CLML",source_object_hash:contentHash,preserve_hierarchy:true},
       })});
     }catch{rejected++;}
@@ -195,6 +215,7 @@ LIMIT ${Math.min(Math.max(limit,1),500)}`;
     });
     if(!existing.has(externalId)) jobs.push({
       source_id:source.id,job_type:"eurlex_structured_fetch_parse",status:"queued",
+      idempotency_key:`eurlex-structured:${source.id}:${externalId}:${contentHash}`,
       payload:{external_id:externalId,celex,work_uri:work,canonical_url:canonicalUrl,jurisdiction_code:"EU",
         parser:"cellar-rdf",preserve_structure:true,verify_item_rights:true},
     });
@@ -301,8 +322,9 @@ async function ingestTanzaniaOag(source:any,runId:string){
     });
     if(!existing.has(externalId)) jobs.push({
       source_id:source.id,job_type:"official_pdf_fetch_parse",status:"queued",
+      idempotency_key:`public-docling:${source.id}:${externalId}:${contentHash}`,
       payload:{external_id:externalId,download_url:downloadUrl,jurisdiction_code:"TZ",document_type:collection.documentType,
-        parser:"docling",preserve_pages:true,preserve_coordinates:true}
+        file_name:`${collection.key}-${id}.pdf`,parser:"docling",preserve_pages:true,preserve_coordinates:true}
     });
   }
 
@@ -322,12 +344,18 @@ async function ingestTanzaniaOag(source:any,runId:string){
 }
 
 Deno.serve(async(request)=>{
-  if(request.method==="OPTIONS") return new Response(null,{headers:cors});
-  if(request.method!=="POST") return json({error:"POST required"},405);
+  const origin=request.headers.get("origin");
+  if(request.method==="OPTIONS"){
+    if(origin&&!ALLOWED_ORIGINS.has(origin)) return new Response(null,{status:403});
+    return new Response(null,{headers:cors(request)});
+  }
+  if(request.method!=="POST") return json(request,{error:"POST required"},405);
+  if(origin&&!ALLOWED_ORIGINS.has(origin)) return json(request,{error:"Origin not allowed"},403);
   const auth=request.headers.get("authorization")||"";
-  if(!auth.startsWith("Bearer ")) return json({error:"Authentication required"},401);
-  const user=await authenticate(auth);
-  if(!user) return json({error:"Corpus operator role required"},403);
+  const apiKey=request.headers.get("apikey")||"";
+  if(!auth.startsWith("Bearer ")&&apiKey!==S) return json(request,{error:"Authentication required"},401);
+  const user=await authenticate(auth,apiKey);
+  if(!user) return json(request,{error:"Corpus operator role required"},403);
 
   let runId:string|undefined;
   try{
@@ -336,13 +364,13 @@ Deno.serve(async(request)=>{
     const mode=String(input.mode||"incremental_sync");
     const requestedLimit=Math.max(Number(input.limit||10),1);
     const limit=adapter==="eurlex"?Math.min(requestedLimit,500):Math.min(requestedLimit,20);
-    if(!["uk_legislation","tz_oag","eurlex"].includes(adapter)) return json({error:"Connector is not enabled"},400);
+    if(!["uk_legislation","tz_oag","eurlex"].includes(adapter)) return json(request,{error:"Connector is not enabled"},400);
     const rows=await service(`source_registry?select=*&adapter_key=eq.${encodeURIComponent(adapter)}`);
     const source=rows?.[0];
-    if(!source) return json({error:"Source registry entry not found"},404);
+    if(!source) return json(request,{error:"Source registry entry not found"},404);
     const capability=mode==="bulk_ingest"?"bulk_ingest":mode==="individual_fetch"?"individual_fetch":"discover";
     const allowed=await service(`rpc/source_capability_allowed`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({p_source_id:source.id,p_capability:capability})});
-    if(allowed!==true) return json({error:"Source policy gate denied this operation",source:source.name,capability},403);
+    if(allowed!==true) return json(request,{error:"Source policy gate denied this operation",source:source.name,capability},403);
 
     const connectorVersion=adapter==="tz_oag"?"tz-oag@1":adapter==="eurlex"?"eurlex-cellar@1":"uk-legislation@1";
     const runs=await service("connector_runs",{method:"POST",headers:{"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({
@@ -361,9 +389,9 @@ Deno.serve(async(request)=>{
       source_id:source.id,cursor:result.cursor,watermark:result.cursor.published_before,etag:result.feedHeaders.etag,last_modified:result.feedHeaders.last_modified,
       consecutive_failures:0,updated_at:new Date().toISOString(),
     })});
-    return json({ok:true,run_id:runId,source:source.name,...result});
+    return json(request,{ok:true,run_id:runId,source:source.name,...result});
   }catch(error){
     if(runId) await service(`connector_runs?id=eq.${runId}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status:"failed",error_summary:error instanceof Error?error.message:"Unknown error",completed_at:new Date().toISOString()})}).catch(()=>undefined);
-    return json({error:"Corpus ingestion failed",run_id:runId},500);
+    return json(request,{error:"Corpus ingestion failed",run_id:runId},500);
   }
 });
