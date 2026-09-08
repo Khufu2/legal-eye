@@ -1,0 +1,3511 @@
+/*
+ * LEGAL EYE — MIDNIGHT EDITORIAL SYSTEM
+ * ------------------------------------------------------------
+ * Visual direction: deep editorial navy + cool paper + restrained
+ * authority/status accents. The design intentionally separates
+ * product chrome (dark) from long-form legal reading surfaces (paper)
+ * so the interface feels premium without sacrificing reading comfort.
+ *
+ * Core palette sampled from the supplied reference artwork:
+ *   Midnight        #040517
+ *   Midnight soft   #07091A
+ *   Surface         #0D0F20
+ *   Hairline        #25283B
+ *   Quiet text      #A9AEBA
+ *   Cool text       #B2B8C5
+ *
+ * This file is imported after globals.css so it can overhaul the
+ * visual system without touching existing product logic or workflows.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --le-midnight: #040517;
+  --le-midnight-soft: #07091a;
+  --le-surface: #0b0d1c;
+  --le-surface-2: #101221;
+  --le-surface-3: #15182a;
+  --le-line: #25283b;
+  --le-line-soft: #1a1d2e;
+  --le-text: #f3f4f8;
+  --le-text-soft: #d9dde6;
+  --le-text-muted: #a9aeba;
+  --le-text-faint: #737888;
+  --le-paper: #f4f5f8;
+  --le-paper-2: #eceef3;
+  --le-paper-line: #d7dae2;
+  --le-paper-ink: #080a16;
+  --le-paper-muted: #5f6472;
+  --le-success: #89b6a2;
+  --le-success-bg: #12241f;
+  --le-info: #9cb2d8;
+  --le-info-bg: #121b2b;
+  --le-warn: #d0aa72;
+  --le-warn-bg: #2b2114;
+  --le-danger: #d99591;
+  --le-danger-bg: #2d181c;
+
+  --background: var(--le-midnight);
+  --foreground: var(--le-text);
+  --card: var(--le-surface);
+  --card-foreground: var(--le-text);
+  --popover: var(--le-surface-2);
+  --popover-foreground: var(--le-text);
+  --primary: #eef0f5;
+  --primary-foreground: #070817;
+  --secondary: #15182a;
+  --secondary-foreground: #e5e8ef;
+  --muted: #121522;
+  --muted-foreground: var(--le-text-muted);
+  --accent: #181b2d;
+  --accent-foreground: #ffffff;
+  --destructive: #b75c60;
+  --border: var(--le-line);
+  --input: #25283b;
+  --ring: #aab1c3;
+  --radius: .75rem;
+
+  --sidebar: var(--le-midnight);
+  --sidebar-foreground: var(--le-text-soft);
+  --sidebar-primary: #f2f3f7;
+  --sidebar-primary-foreground: #050617;
+  --sidebar-accent: #111426;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--le-line-soft);
+  --sidebar-ring: #b2b8c5;
+
+  --ink: var(--le-text);
+  --quiet: var(--le-text-muted);
+  --line: var(--le-line);
+  --paper: var(--le-surface);
+  --canvas: var(--le-midnight);
+  --deep: var(--le-paper);
+  --green: var(--le-success);
+  --blue: var(--le-info);
+  --amber: var(--le-warn);
+  --red: var(--le-danger);
+}
+
+@theme inline {
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Baskerville, Georgia, serif;
+}
+
+html {
+  background: var(--le-midnight);
+  scrollbar-color: #34384d transparent;
+}
+
+body {
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 78% -18%, rgba(95, 105, 155, .12), transparent 34rem),
+    var(--le-midnight);
+  color: var(--le-text);
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  font-size: 13px;
+  letter-spacing: -.006em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+::selection {
+  background: #d8dce8;
+  color: #050617;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 1px solid #cbd0dc;
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* App shell                                                           */
+/* ------------------------------------------------------------------ */
+
+.app-inset {
+  min-width: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.018), transparent 180px),
+    var(--le-midnight);
+}
+
+.legal-sidebar [data-sidebar="sidebar"] {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.018), transparent 180px),
+    var(--le-midnight);
+  border-color: var(--le-line-soft);
+  box-shadow: none;
+}
+
+.legal-sidebar [data-sidebar="content"] {
+  padding: 9px 8px 14px;
+}
+
+.legal-sidebar [data-sidebar="group"] {
+  padding: 0 3px;
+}
+
+.legal-sidebar [data-sidebar="group-label"] {
+  height: auto;
+  margin: 19px 0 7px;
+  padding: 0 10px;
+  color: #686d7c;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+.legal-sidebar [data-sidebar="menu"] {
+  gap: 2px;
+}
+
+.legal-sidebar [data-sidebar="menu-button"] {
+  min-height: 37px;
+  gap: 9px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #aeb3c0;
+  font-size: 12px;
+  font-weight: 510;
+  letter-spacing: -.005em;
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .16s ease;
+}
+
+.legal-sidebar [data-sidebar="menu-button"] svg {
+  width: 15px;
+  height: 15px;
+  color: #777d8d;
+  stroke-width: 1.65;
+}
+
+.legal-sidebar [data-sidebar="menu-button"]:hover {
+  background: rgba(255,255,255,.035);
+  color: #f2f3f7;
+}
+
+.legal-sidebar [data-sidebar="menu-button"][data-active="true"] {
+  border-color: #25293d;
+  background: linear-gradient(180deg, #15182a, #111426);
+  box-shadow: inset 0 1px rgba(255,255,255,.035), 0 5px 18px rgba(0,0,0,.16);
+  color: #ffffff;
+}
+
+.legal-sidebar [data-sidebar="menu-button"][data-active="true"]::before {
+  content: "";
+  width: 2px;
+  height: 14px;
+  position: absolute;
+  left: 2px;
+  border-radius: 4px;
+  background: #d7dbe5;
+  opacity: .9;
+}
+
+.legal-sidebar [data-sidebar="menu-button"][data-active="true"] svg {
+  color: #eef0f5;
+}
+
+.brand-head {
+  height: 76px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 11px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--le-line-soft);
+  overflow: hidden;
+}
+
+.brand-mark {
+  width: 33px;
+  height: 33px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid #34384d;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #15182a, #090b19);
+  box-shadow: inset 0 1px rgba(255,255,255,.06), 0 10px 24px rgba(0,0,0,.22);
+  color: #f5f6f8;
+  font: 600 12px/1 "Iowan Old Style", Georgia, serif;
+  letter-spacing: .06em;
+}
+
+.brand-mark.small {
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.brand-head > span:last-child {
+  min-width: 118px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.brand-head b {
+  color: #f5f6f8;
+  font: 560 18px/1.05 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.02em;
+}
+
+.brand-head small {
+  margin-top: 6px;
+  color: #727787;
+  font-size: 8px;
+  font-weight: 620;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.nav-count {
+  margin-left: auto;
+  min-width: 19px;
+  padding: 1px 6px;
+  border: 1px solid #2e3347;
+  border-radius: 999px;
+  background: #171a2d;
+  color: #c7ccd7;
+  font-size: 9px;
+  font-style: normal;
+  text-align: center;
+}
+
+.user-foot {
+  padding: 10px;
+  border-top: 1px solid var(--le-line-soft);
+}
+
+.user-foot button {
+  width: 100%;
+  min-height: 47px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: inherit;
+  text-align: left;
+  overflow: hidden;
+  transition: background .16s ease, border-color .16s ease;
+}
+
+.user-foot button:hover {
+  border-color: #23273a;
+  background: #0e1120;
+}
+
+.user-foot i {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2a2e43;
+  border-radius: 8px;
+  background: #131629;
+  color: #dce0e8;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 720;
+}
+
+.user-foot span {
+  min-width: 94px;
+  display: flex;
+  flex-direction: column;
+}
+
+.user-foot b {
+  color: #dde0e8;
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.user-foot small {
+  margin-top: 3px;
+  color: #707584;
+  font-size: 9px;
+}
+
+.user-foot svg {
+  width: 13px;
+  margin-left: auto;
+  color: #666c7c;
+}
+
+.context-head {
+  height: 58px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 16px 0 12px;
+  border-bottom: 1px solid var(--le-line-soft);
+  background: rgba(4, 5, 23, .86);
+  box-shadow: 0 1px rgba(255,255,255,.012);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+
+.context-head > div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.context-head > div:first-child > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: #737888;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.context-head > div:first-child svg {
+  width: 11px;
+  color: #555a6a;
+}
+
+.context-head b {
+  color: #d7dbe3;
+  font-weight: 590;
+}
+
+.context-pill,
+.clock {
+  height: 31px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #24283a;
+  border-radius: 8px;
+  background: #0d1020;
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+  color: #aeb3bf;
+  font-size: 10px;
+}
+
+.context-pill:hover,
+.clock:hover {
+  border-color: #34384e;
+  background: #131629;
+  color: #edf0f5;
+}
+
+.privacy-pill {
+  background: transparent;
+}
+
+.clock {
+  width: 31px;
+  justify-content: center;
+  padding: 0;
+}
+
+.context-head svg {
+  width: 13px;
+  height: 13px;
+}
+
+.context-head kbd,
+.command-list kbd {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border: 1px solid #2b2f43;
+  border-radius: 4px;
+  background: #121526;
+  color: #757b8b;
+  font-family: inherit;
+  font-size: 8px;
+  box-shadow: inset 0 1px rgba(255,255,255,.025);
+}
+
+.system-bar {
+  height: 31px;
+  position: fixed;
+  z-index: 30;
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 15px;
+  border-top: 1px solid var(--le-line-soft);
+  background: rgba(5, 6, 23, .94);
+  color: #696f7e;
+  font-size: 9px;
+  backdrop-filter: blur(16px);
+  transition: left .2s ease;
+}
+
+.group[data-state="collapsed"] ~ .app-inset .system-bar {
+  left: var(--sidebar-width-icon);
+}
+
+.system-bar span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.system-bar i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #8eb7a5;
+  box-shadow: 0 0 0 3px rgba(142,183,165,.09);
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared type, badges and controls                                    */
+/* ------------------------------------------------------------------ */
+
+.serif {
+  font-family: "Iowan Old Style", "Palatino Linotype", Baskerville, Georgia, serif;
+}
+
+.muted {
+  color: var(--le-text-muted);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spread {
+  justify-content: space-between;
+}
+
+.eyebrow {
+  color: #7b8090;
+  font-size: 9px;
+  font-weight: 690;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+
+.tone-badge {
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid #2a2e42;
+  border-radius: 999px;
+  box-shadow: none;
+  background: #141728;
+  color: #aeb4c1;
+  font-size: 8px;
+  font-weight: 690;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.tone-green {
+  border-color: #29443a;
+  background: var(--le-success-bg);
+  color: var(--le-success);
+}
+
+.tone-blue {
+  border-color: #273951;
+  background: var(--le-info-bg);
+  color: var(--le-info);
+}
+
+.tone-amber {
+  border-color: #4a3820;
+  background: var(--le-warn-bg);
+  color: var(--le-warn);
+}
+
+.tone-red {
+  border-color: #4b292c;
+  background: var(--le-danger-bg);
+  color: var(--le-danger);
+}
+
+.view-pad {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+  padding: 34px 34px 72px;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 26px;
+  margin-bottom: 28px;
+}
+
+.section-header h1,
+.page-toolbar h1 {
+  margin: 0;
+  color: #f3f4f8;
+  font: 520 clamp(31px, 3vw, 44px)/1.03 "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  letter-spacing: -.035em;
+}
+
+.section-header p {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: #8f95a4;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Shadcn buttons inherit the new palette via variables; these additions
+   sharpen spacing and remove the generic dashboard feel. */
+button[data-slot="button"],
+.context-head button[class*="inline-flex"],
+.section-header button[class*="inline-flex"],
+.page-toolbar button[class*="inline-flex"] {
+  border-radius: 8px;
+  font-weight: 570;
+  letter-spacing: -.01em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Research — flagship three-pane workspace                            */
+/* ------------------------------------------------------------------ */
+
+.research-page {
+  min-height: calc(100svh - 89px);
+  display: flex;
+  flex-direction: column;
+  background: var(--le-midnight);
+}
+
+.research-bar {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--le-line-soft);
+  background: #070919;
+}
+
+.research-bar > svg {
+  width: 15px;
+  margin-left: 3px;
+  color: #747a8a;
+}
+
+.research-bar input {
+  height: 37px;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #eef0f5;
+  font: 500 14px/1.2 "Iowan Old Style", Georgia, serif;
+}
+
+.research-bar input::placeholder {
+  color: #5d6272;
+}
+
+.research-bar input:focus-visible {
+  outline: 0;
+  border-color: transparent;
+}
+
+.research-grid {
+  min-height: calc(100svh - 147px);
+  display: grid;
+  grid-template-columns: 252px minmax(500px, 1fr) 338px;
+  background: var(--le-line-soft);
+  gap: 1px;
+}
+
+.plan-pane {
+  min-width: 0;
+  border-right: 0;
+  background: #080a19;
+}
+
+.pane-title {
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--le-line-soft);
+  color: #8f95a5;
+  font-size: 9px;
+  font-weight: 690;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.pane-title svg {
+  width: 13px;
+  color: #737888;
+}
+
+.pane-title > div {
+  display: flex;
+}
+
+.pane-title button {
+  width: 29px;
+  height: 29px;
+}
+
+.plan-block {
+  padding: 15px 14px;
+  border-bottom: 1px solid var(--le-line-soft);
+}
+
+.plan-block > p {
+  margin: 8px 0 0;
+  color: #c1c6d0;
+  font: 12px/1.52 "Iowan Old Style", Georgia, serif;
+}
+
+.plan-step {
+  display: grid;
+  grid-template-columns: 20px 1fr 14px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+  color: #8e94a4;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.plan-step i {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #292d41;
+  border-radius: 50%;
+  background: #101323;
+  color: #a9afbc;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.plan-step svg {
+  width: 11px;
+  color: var(--le-success);
+}
+
+.authority-mini {
+  width: 100%;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 9px 9px 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  transition: background .15s ease, border-color .15s ease;
+}
+
+.authority-mini span {
+  overflow: hidden;
+  color: #c8ccd5;
+  font: 11px "Iowan Old Style", Georgia, serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authority-mini small {
+  overflow: hidden;
+  color: #666c7c;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authority-mini:hover,
+.authority-mini.active {
+  border-color: #262a3d;
+  background: #111426;
+}
+
+.authority-mini.active {
+  box-shadow: inset 2px 0 #b9bfcd;
+}
+
+.answer-pane {
+  min-width: 0;
+  background: var(--le-paper);
+  color: var(--le-paper-ink);
+}
+
+.answer-head {
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--le-paper-line);
+  background: rgba(244,245,248,.93);
+  backdrop-filter: blur(14px);
+}
+
+.answer-head > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.answer-head .eyebrow {
+  color: #737786;
+}
+
+.answer-head button {
+  color: #4f5462;
+}
+
+.verified {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #4f6d61;
+  font-size: 8px;
+  font-weight: 600;
+}
+
+.verified svg {
+  width: 11px;
+}
+
+.answer-content {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 52px 58px 78px;
+}
+
+.answer-content h2 {
+  max-width: 660px;
+  margin: 0 0 18px;
+  color: #090b17;
+  font: 520 clamp(30px, 3vw, 42px)/1.06 "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  letter-spacing: -.038em;
+}
+
+.answer-content .standfirst {
+  max-width: 660px;
+  margin: 0 0 34px;
+  color: #4d5260;
+  font: 17px/1.55 "Iowan Old Style", Georgia, serif;
+}
+
+.answer-content h3 {
+  margin: 31px 0 9px;
+  color: #171925;
+  font: 650 15px "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.012em;
+}
+
+.answer-content p,
+.answer-content li {
+  color: #343844;
+  font: 14px/1.76 "Iowan Old Style", Georgia, serif;
+}
+
+.answer-content ol {
+  padding-left: 21px;
+}
+
+.live-answer {
+  margin: 0 0 28px;
+  padding: 17px 18px;
+  border: 1px solid #d5d9e1;
+  border-radius: 12px;
+  background: #eef0f4;
+}
+
+.live-answer > span {
+  color: #626877;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.live-answer p {
+  margin: 8px 0 0;
+}
+
+.citation-chip {
+  width: 19px;
+  height: 19px;
+  display: inline-grid;
+  place-items: center;
+  transform: translateY(-1px);
+  border: 1px solid #bcc1cf;
+  border-radius: 5px;
+  background: #e4e7ed;
+  color: #343a4a;
+  font-family: Inter, sans-serif;
+  font-size: 8px;
+  font-weight: 760;
+  transition: border-color .14s ease, background .14s ease, transform .14s ease;
+}
+
+.citation-chip:hover {
+  transform: translateY(-2px);
+  border-color: #777f92;
+  background: #d9dde5;
+}
+
+.proposition {
+  display: grid;
+  grid-template-columns: 30px 1fr 20px;
+  gap: 11px;
+  margin: 24px 0;
+  padding: 15px;
+  border: 1px solid #d1d5de;
+  border-radius: 10px;
+  background: #eceff2;
+}
+
+.proposition > svg {
+  width: 29px;
+  height: 29px;
+  padding: 7px;
+  border-radius: 8px;
+  background: #dce2e3;
+  color: #465c56;
+}
+
+.proposition span {
+  color: #54615e;
+  font-family: Inter, sans-serif;
+  font-size: 8px;
+  font-weight: 720;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.proposition p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.answer-metrics {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  padding-top: 0;
+  border: 1px solid #d7dae2;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #d7dae2;
+}
+
+.answer-metrics div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px 14px;
+  background: #eef0f4;
+}
+
+.answer-metrics span {
+  color: #777c89;
+  font-family: Inter, sans-serif;
+  font-size: 8px;
+  font-weight: 670;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.answer-metrics b {
+  color: #2f3340;
+  font-family: Inter, sans-serif;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.source-viewer {
+  height: calc(100svh - 147px);
+  position: sticky;
+  top: 103px;
+  overflow: hidden;
+  border-left: 0;
+  background: #090b1a;
+  color: var(--le-text-soft);
+}
+
+.source-body {
+  height: calc(100% - 45px);
+  overflow: auto;
+  padding: 29px 25px 42px;
+}
+
+.source-body h2 {
+  margin: 10px 0 7px;
+  color: #eef0f4;
+  font: 520 23px/1.12 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.025em;
+}
+
+.source-body .serif {
+  color: #979cab;
+}
+
+.source-body hr {
+  margin: 25px 0;
+  border: 0;
+  border-top: 1px solid var(--le-line-soft);
+}
+
+.source-meta {
+  margin-top: 17px;
+  align-items: flex-start;
+}
+
+.source-meta > span:last-child {
+  margin-top: 3px;
+  color: #6c7181;
+  font-size: 8px;
+}
+
+.source-body blockquote {
+  margin: 10px 0 8px;
+  padding: 0 0 0 15px;
+  border-left: 1px solid #565d72;
+  color: #c7cbd4;
+  font: 15px/1.62 "Iowan Old Style", Georgia, serif;
+}
+
+.source-body small {
+  color: #6e7483;
+  font-size: 8px;
+}
+
+.source-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #9096a5;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.source-note svg {
+  width: 14px;
+  flex: 0 0 auto;
+  color: #8eb7a5;
+}
+
+.source-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 20px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Ask / command surface                                               */
+/* ------------------------------------------------------------------ */
+
+.ask-view {
+  max-width: 1140px;
+  padding-top: clamp(46px, 8vh, 90px);
+}
+
+.ask-view .section-header {
+  display: block;
+  margin-bottom: 29px;
+}
+
+.ask-view .section-header h1 {
+  max-width: 760px;
+  font-size: clamp(48px, 6vw, 78px);
+  line-height: .98;
+  letter-spacing: -.05em;
+}
+
+.ask-view .section-header p {
+  max-width: 620px;
+  margin-top: 14px;
+  color: #9298a7;
+  font: 16px/1.55 "Iowan Old Style", Georgia, serif;
+}
+
+.composer {
+  padding: 15px;
+  border: 1px solid #2a2e43;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #101322, #0b0d1b);
+  box-shadow: inset 0 1px rgba(255,255,255,.035), 0 28px 70px rgba(0,0,0,.20);
+}
+
+.composer textarea {
+  min-height: 126px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #f1f3f7;
+  font: 19px/1.48 "Iowan Old Style", Georgia, serif;
+}
+
+.composer textarea::placeholder {
+  color: #626777;
+}
+
+.composer textarea:focus-visible {
+  outline: 0;
+}
+
+.options {
+  flex-wrap: wrap;
+}
+
+.prompt-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.prompt-grid > button {
+  min-height: 152px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 17px;
+  border: 1px solid #202438;
+  border-radius: 12px;
+  background: #090b1a;
+  color: inherit;
+  text-align: left;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.prompt-grid > button:hover {
+  transform: translateY(-2px);
+  border-color: #373b50;
+  background: #0f1222;
+}
+
+.prompt-grid > button > svg:first-child {
+  width: 18px;
+  color: #959baa;
+}
+
+.prompt-grid strong {
+  margin-top: 8px;
+  color: #e4e7ed;
+  font: 520 18px "Iowan Old Style", Georgia, serif;
+}
+
+.prompt-grid span {
+  color: #777d8c;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.prompt-grid > button > svg:last-child {
+  width: 14px;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  color: #5d6272;
+}
+
+.recent {
+  margin-top: 35px;
+}
+
+.recent h2 {
+  color: #dfe2e8;
+  font: 520 18px "Iowan Old Style", Georgia, serif;
+}
+
+.recent > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px 1fr auto 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px;
+  border: 0;
+  border-top: 1px solid #1c2031;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.recent > button:hover {
+  background: linear-gradient(90deg, rgba(255,255,255,.024), transparent);
+}
+
+.recent > button i {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #25293d;
+  border-radius: 8px;
+  background: #0e1120;
+}
+
+.recent > button i svg {
+  width: 14px;
+  color: #9096a5;
+}
+
+.recent > button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recent b {
+  color: #d8dce4;
+  font-size: 11px;
+}
+
+.recent small,
+.recent time {
+  margin-top: 3px;
+  color: #696f7f;
+  font-size: 9px;
+}
+
+.recent > button > svg {
+  width: 13px;
+  color: #5d6272;
+}
+
+/* ------------------------------------------------------------------ */
+/* Draft/editor                                                        */
+/* ------------------------------------------------------------------ */
+
+.draft-view {
+  min-height: calc(100svh - 89px);
+  background: var(--le-midnight);
+}
+
+.doc-toolbar,
+.page-toolbar {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--le-line-soft);
+  background: #070919;
+}
+
+.doc-toolbar > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-toolbar > div:first-child b {
+  color: #e4e7ed;
+  font: 520 16px "Iowan Old Style", Georgia, serif;
+}
+
+.editor-grid {
+  min-height: calc(100svh - 155px);
+  display: grid;
+  grid-template-columns: 218px minmax(560px, 1fr) 322px;
+  gap: 1px;
+  background: var(--le-line-soft);
+}
+
+.outline-pane,
+.ai-pane {
+  background: #080a19;
+}
+
+.outline-pane > button {
+  width: calc(100% - 16px);
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: center;
+  gap: 7px;
+  margin: 2px 8px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #8c92a1;
+  font-size: 10px;
+  text-align: left;
+}
+
+.outline-pane > button span {
+  color: #5e6474;
+  font-size: 8px;
+}
+
+.outline-pane > button:hover,
+.outline-pane > button.active {
+  border-color: #25293c;
+  background: #111426;
+  color: #e2e5eb;
+}
+
+.doc-canvas {
+  min-width: 0;
+  overflow: auto;
+  padding: 42px 32px 76px;
+  background:
+    radial-gradient(circle at 50% 0, rgba(121,131,173,.09), transparent 32rem),
+    #0a0c1a;
+}
+
+.doc-page {
+  width: min(100%, 780px);
+  min-height: 960px;
+  margin: 0 auto;
+  padding: 66px 72px;
+  border: 1px solid #d9dce4;
+  border-radius: 3px;
+  background: var(--le-paper);
+  box-shadow: 0 34px 90px rgba(0,0,0,.34), 0 1px 2px rgba(0,0,0,.14);
+  color: var(--le-paper-ink);
+}
+
+.doc-page > small {
+  color: #747987;
+  font-family: Inter, sans-serif;
+  font-size: 8px;
+  font-weight: 680;
+  letter-spacing: .13em;
+}
+
+.doc-page h1 {
+  margin: 16px 0 30px;
+  color: #0d0e1a;
+  font: 520 39px/1.05 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.04em;
+}
+
+.doc-page h2 {
+  margin: 34px 0 14px;
+  color: #151723;
+  font: 620 19px "Iowan Old Style", Georgia, serif;
+}
+
+.doc-page p,
+.doc-page b {
+  color: #373b47;
+  font: 14px/1.65 "Iowan Old Style", Georgia, serif;
+}
+
+.doc-page textarea {
+  min-height: 250px;
+  border: 1px solid #d4d8e0;
+  background: #f7f8fa;
+  color: #2d303b;
+  font: 14px/1.68 "Iowan Old Style", Georgia, serif;
+}
+
+.clause-alert {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 11px;
+  border: 1px solid #dfc6c8;
+  border-radius: 8px;
+  background: #f4e9ea;
+  color: #7d4247;
+  font-family: Inter, sans-serif;
+  font-size: 9px;
+}
+
+.clause-alert svg {
+  width: 13px;
+}
+
+.ai-pane {
+  min-width: 0;
+  padding-bottom: 30px;
+}
+
+.ai-head {
+  height: 45px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border-bottom: 1px solid var(--le-line-soft);
+}
+
+.ai-head b {
+  color: #e0e3ea;
+  font: 520 14px "Iowan Old Style", Georgia, serif;
+}
+
+.ai-head > svg {
+  width: 13px;
+  margin-left: auto;
+  color: #686e7e;
+}
+
+.ai-card {
+  margin: 12px 12px 0;
+  padding: 13px;
+  border: 1px solid #23273a;
+  border-radius: 10px;
+  background: #0d1020;
+}
+
+.ai-card p {
+  margin: 8px 0 0;
+  color: #aeb4c1;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.ai-card.risk {
+  border-color: #38272e;
+  background: #130f1c;
+}
+
+.ai-card.suggestion {
+  border-color: #29313d;
+  background: #0d121d;
+}
+
+.ai-card button {
+  width: 100%;
+  margin-top: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: #aab2c2;
+  font-size: 9px;
+  text-align: left;
+}
+
+.ai-card button svg {
+  width: 12px;
+}
+
+.ai-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 13px 12px 0;
+}
+
+.ai-actions > button:first-child {
+  grid-column: 1 / -1;
+}
+
+.ai-pane > .wide {
+  width: calc(100% - 24px);
+  margin: 7px 12px 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tables / lists                                                      */
+/* ------------------------------------------------------------------ */
+
+.tables-view {
+  min-height: calc(100svh - 89px);
+  padding-bottom: 50px;
+  background: var(--le-midnight);
+}
+
+.page-toolbar {
+  padding: 14px 21px;
+}
+
+.page-toolbar > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.page-toolbar h1 {
+  font-size: 26px;
+}
+
+.table-toolbar {
+  min-height: 47px;
+  display: grid;
+  grid-template-columns: auto auto auto 1fr auto auto;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--le-line-soft);
+  background: #090b1a;
+}
+
+.table-toolbar small {
+  color: #777d8d;
+  font-size: 9px;
+}
+
+.legal-table {
+  overflow: auto;
+}
+
+.legal-table table,
+.checklist table {
+  color: #cbd0d9;
+}
+
+.legal-table thead,
+.checklist thead {
+  background: #0b0e1d;
+}
+
+.legal-table th,
+.checklist th {
+  height: 42px;
+  border-bottom: 1px solid #202438;
+  color: #707686;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.legal-table td,
+.checklist td {
+  border-bottom: 1px solid #171b2b;
+  color: #aeb4c0;
+  font-size: 10px;
+}
+
+.legal-table tbody tr,
+.checklist tbody tr {
+  background: #070919;
+  transition: background .14s ease;
+}
+
+.legal-table tbody tr:hover,
+.checklist tbody tr:hover {
+  background: #0d1020;
+}
+
+.legal-table td:first-child > div {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: 8px;
+}
+
+.legal-table td:first-child b,
+.checklist b {
+  color: #dce0e7;
+  font-weight: 600;
+}
+
+.legal-table td:first-child small {
+  color: #666c7b;
+  font-size: 8px;
+}
+
+.review-cell {
+  min-width: 126px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.review-cell:hover {
+  border-color: #2a2e42;
+  background: #121526;
+}
+
+.review-cell small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #6d7382;
+  font-size: 8px;
+}
+
+.review-cell small i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--le-success);
+}
+
+.review-cell svg {
+  width: 11px;
+}
+
+.table-foot {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 15px;
+  border-bottom: 1px solid var(--le-line-soft);
+  background: #070919;
+  color: #676d7c;
+  font-size: 8px;
+}
+
+.table-foot span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.table-foot svg {
+  width: 11px;
+  color: var(--le-success);
+}
+
+.list-summary {
+  display: grid;
+  grid-template-columns: 170px minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 15px;
+  padding: 15px 17px;
+  border: 1px solid #222638;
+  border-radius: 11px;
+  background: #090b1a;
+}
+
+.list-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.list-summary span,
+.list-summary small {
+  color: #747a89;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.list-summary b {
+  color: #e2e5eb;
+  font: 520 18px "Iowan Old Style", Georgia, serif;
+}
+
+.checklist {
+  overflow: hidden;
+  border: 1px solid #202438;
+  border-radius: 11px;
+  background: #080a19;
+}
+
+.checklist td > i {
+  width: 25px;
+  height: 25px;
+  display: inline-grid;
+  place-items: center;
+  margin-right: 7px;
+  border: 1px solid #2b2f43;
+  border-radius: 7px;
+  background: #121526;
+  color: #aab0bd;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  color: #a9b4ca;
+  font-size: 9px;
+}
+
+.source-link svg {
+  width: 11px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Agent                                                               */
+/* ------------------------------------------------------------------ */
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 13px;
+}
+
+.agent-card,
+.run-side {
+  border: 1px solid #22263a;
+  border-radius: 12px;
+  background: #080a19;
+  overflow: hidden;
+}
+
+.run-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 19px;
+  border-bottom: 1px solid var(--le-line-soft);
+}
+
+.run-head > i {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2a2e43;
+  border-radius: 10px;
+  background: #121526;
+}
+
+.run-head > i svg {
+  width: 17px;
+  color: #a5abba;
+}
+
+.run-head h2 {
+  max-width: 700px;
+  margin: 6px 0 0;
+  color: #e8eaf0;
+  font: 520 22px/1.2 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.025em;
+}
+
+.progress-block {
+  padding: 14px 19px;
+  border-bottom: 1px solid var(--le-line-soft);
+}
+
+.progress-block span,
+.progress-block b {
+  color: #878d9c;
+  font-size: 9px;
+}
+
+.timeline {
+  padding: 7px 10px 15px;
+}
+
+.timeline > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.timeline > button:hover,
+.timeline > button.active {
+  border-color: #23273a;
+  background: #0e1120;
+}
+
+.timeline > button > i {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2a2e42;
+  border-radius: 50%;
+  color: #717786;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.timeline > button.done > i {
+  border-color: #29443a;
+  background: #10211c;
+  color: var(--le-success);
+}
+
+.timeline > button.active > i {
+  border-color: #4c5268;
+  background: #161a2d;
+}
+
+.timeline > button.active > i > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d7dbe4;
+  box-shadow: 0 0 0 4px rgba(215,219,228,.08);
+}
+
+.timeline > button > i svg {
+  width: 12px;
+}
+
+.timeline > button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.timeline b {
+  color: #cfd3dc;
+  font-size: 10px;
+}
+
+.timeline small {
+  color: #666c7c;
+  font-size: 8px;
+}
+
+.timeline > button > svg {
+  width: 12px;
+  color: #5f6575;
+}
+
+.run-side {
+  align-self: start;
+}
+
+.run-side .control,
+.settings .control {
+  padding: 14px;
+  border-bottom: 1px solid var(--le-line-soft);
+}
+
+.control > span {
+  color: #717786;
+  font-size: 8px;
+  font-weight: 680;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.control b {
+  display: block;
+  margin-top: 5px;
+  color: #d3d7df;
+  font: 520 14px "Iowan Old Style", Georgia, serif;
+}
+
+.control p {
+  margin: 5px 0 0;
+  color: #747a89;
+  font-size: 9px;
+  line-height: 1.48;
+}
+
+.run-side > button {
+  width: calc(100% - 24px);
+  margin: 12px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Skills                                                              */
+/* ------------------------------------------------------------------ */
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 13px;
+}
+
+.skill-list,
+.skill-detail {
+  border: 1px solid #222638;
+  border-radius: 12px;
+  background: #080a19;
+  overflow: hidden;
+}
+
+.skill-list > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 13px;
+  border: 0;
+  border-bottom: 1px solid #171b2b;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.skill-list > button:hover,
+.skill-list > button.active {
+  background: #0e1120;
+}
+
+.skill-list > button.active {
+  box-shadow: inset 2px 0 #c6cbd6;
+}
+
+.skill-list i {
+  width: 33px;
+  height: 33px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #272b3f;
+  border-radius: 9px;
+  background: #121526;
+}
+
+.skill-list i svg {
+  width: 14px;
+  color: #9ba1af;
+}
+
+.skill-list > button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill-list b {
+  color: #d7dbe3;
+  font-size: 10px;
+}
+
+.skill-list small {
+  overflow: hidden;
+  color: #676d7c;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-list > button > svg {
+  width: 12px;
+  color: #5d6373;
+}
+
+.skill-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  border-bottom: 1px solid var(--le-line-soft);
+}
+
+.skill-head h2 {
+  margin: 7px 0 5px;
+  color: #eef0f4;
+  font: 520 29px "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.035em;
+}
+
+.skill-head p {
+  margin: 0;
+  color: #767c8b;
+  font-size: 10px;
+}
+
+.skill-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--le-line-soft);
+  overflow-x: auto;
+}
+
+.skill-tabs button {
+  height: 42px;
+  position: relative;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: #737989;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.skill-tabs button.active {
+  color: #e5e8ee;
+}
+
+.skill-tabs button.active::after {
+  content: "";
+  height: 1px;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  background: #d6dae3;
+}
+
+.instructions {
+  padding: 22px;
+}
+
+.instructions h3 {
+  margin: 0 0 12px;
+  color: #dfe2e9;
+  font: 520 17px "Iowan Old Style", Georgia, serif;
+}
+
+.instructions > div {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 11px;
+  padding: 12px 0;
+  border-top: 1px solid #181c2d;
+}
+
+.instructions > div > span {
+  color: #5e6474;
+  font: 10px "Iowan Old Style", Georgia, serif;
+}
+
+.instructions p {
+  margin: 0;
+  color: #a6acba;
+  font: 13px/1.55 "Iowan Old Style", Georgia, serif;
+}
+
+.skill-detail > footer {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  border-top: 1px solid #202438;
+  background: #202438;
+}
+
+.skill-detail > footer > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: #0a0c1b;
+}
+
+.skill-detail > footer span {
+  color: #6b7180;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.skill-detail > footer b {
+  color: #c7cbd4;
+  font-size: 9px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Monitor / corpus                                                    */
+/* ------------------------------------------------------------------ */
+
+.corpus-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.corpus-strip > div {
+  min-height: 91px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #222638;
+  border-radius: 11px;
+  background: #080a19;
+}
+
+.corpus-strip > div > i {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2a2e42;
+  border-radius: 9px;
+  background: #121526;
+}
+
+.corpus-strip svg {
+  width: 14px;
+  color: #959baa;
+}
+
+.corpus-strip > div > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.corpus-strip small {
+  color: #737989;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.corpus-strip b {
+  color: #e6e8ee;
+  font: 520 22px "Iowan Old Style", Georgia, serif;
+}
+
+.corpus-strip em {
+  color: #616777;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.corpus-ops {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.25fr) repeat(4, minmax(145px, 1fr));
+  gap: 1px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid #222638;
+  border-radius: 11px;
+  background: #222638;
+}
+
+.corpus-ops > div {
+  min-height: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 14px;
+  background: #090b1a;
+}
+
+.corpus-ops > div:first-child {
+  background: #101323;
+  color: #eef0f5;
+}
+
+.corpus-ops > div:first-child .eyebrow,
+.corpus-ops > div:first-child p {
+  color: #858b9a;
+}
+
+.corpus-ops b {
+  color: #dfe2e9;
+  font: 13px "Iowan Old Style", Georgia, serif;
+}
+
+.corpus-ops p {
+  max-width: 320px;
+  margin: 0;
+  color: #747a89;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.corpus-ops > div > span:first-child:not(.eyebrow) {
+  color: #c9cdd6;
+  font: 11px "Iowan Old Style", Georgia, serif;
+}
+
+.corpus-ops small {
+  color: #686e7e;
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.monitor-grid {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #222638;
+  border-radius: 11px;
+  background: #222638;
+}
+
+.monitor-grid > aside,
+.monitor-grid > section {
+  background: #080a19;
+}
+
+.monitor-grid > aside {
+  padding: 7px;
+}
+
+.monitor-grid > aside > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.monitor-grid > aside > button:hover,
+.monitor-grid > aside > button.active {
+  border-color: #25293c;
+  background: #111426;
+}
+
+.monitor-grid > aside > button > svg {
+  width: 13px;
+  color: #858b9a;
+}
+
+.monitor-grid > aside > button > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: #bcc1cc;
+  font-size: 9px;
+}
+
+.monitor-grid > aside small {
+  color: #646a79;
+  font-size: 8px;
+}
+
+.monitor-grid > section > article {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 13px;
+  padding: 18px;
+  border-bottom: 1px solid #191d2e;
+}
+
+.monitor-grid article > time {
+  color: #6c7282;
+  font: 11px "Iowan Old Style", Georgia, serif;
+}
+
+.monitor-grid article header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.monitor-grid article header > i {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2b2f43;
+  border-radius: 8px;
+  background: #121526;
+  color: #9da3b1;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.monitor-grid article header > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.monitor-grid article header small {
+  color: #666c7c;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.monitor-grid article header b {
+  color: #cbd0d9;
+  font-size: 9px;
+}
+
+.monitor-grid article header .tone-badge {
+  margin-left: auto;
+}
+
+.monitor-grid article h2 {
+  margin: 15px 0 10px;
+  color: #eef0f5;
+  font: 520 22px/1.15 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.025em;
+}
+
+.impact {
+  padding: 11px 12px;
+  border: 1px solid #222638;
+  border-radius: 9px;
+  background: #0c0f1e;
+}
+
+.impact span {
+  color: #8e94a3;
+  font-size: 8px;
+  font-weight: 670;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.impact p {
+  margin: 5px 0 0;
+  color: #777d8d;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.monitor-grid article footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.empty-live {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  padding: 42px;
+  border: 0;
+  background: #080a19;
+  color: #8f95a4;
+  text-align: center;
+}
+
+.empty-live > svg {
+  width: 23px;
+  color: var(--le-success);
+}
+
+.empty-live h2 {
+  margin: 13px 0 5px;
+  color: #dfe2e9;
+  font: 18px "Iowan Old Style", Georgia, serif;
+}
+
+.empty-live p {
+  margin: 0;
+  color: #707686;
+  font-size: 9px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Workflow builder                                                    */
+/* ------------------------------------------------------------------ */
+
+.workflow-prompt {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+  border: 1px solid #25293c;
+  border-radius: 11px;
+  background: #0b0e1d;
+}
+
+.workflow-prompt > svg {
+  width: 15px;
+  color: #9da3b1;
+}
+
+.workflow-prompt input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #dfe2e9;
+  font: 12px "Iowan Old Style", Georgia, serif;
+}
+
+.workflow-canvas {
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) 244px;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #222638;
+  border-radius: 12px;
+  background: #222638;
+}
+
+.workflow-canvas > aside,
+.workflow-canvas > section {
+  background: #080a19;
+}
+
+.workflow-canvas > aside:first-child {
+  padding: 7px;
+}
+
+.workflow-canvas > aside:first-child > button {
+  width: 100%;
+  padding: 9px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #6f7585;
+  font-size: 9px;
+  text-align: left;
+}
+
+.workflow-canvas > aside:first-child > button.active,
+.workflow-canvas > aside:first-child > button:hover {
+  border-color: #25293c;
+  background: #111426;
+  color: #d4d8e1;
+}
+
+.graph {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 42px 28px 56px;
+  background:
+    radial-gradient(circle at center top, rgba(121,132,176,.07), transparent 28rem),
+    #090b1a !important;
+}
+
+.flow {
+  width: min(100%, 390px);
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #292d42;
+  border-radius: 10px;
+  background: #101323;
+  box-shadow: 0 15px 38px rgba(0,0,0,.14);
+}
+
+.flow > i {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #30344a;
+  border-radius: 8px;
+  background: #171a2d;
+}
+
+.flow > i svg {
+  width: 14px;
+  color: #a0a6b5;
+}
+
+.flow > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.flow span {
+  color: #686e7e;
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.flow b {
+  color: #d5d9e1;
+  font-size: 10px;
+}
+
+.flow small {
+  color: #707686;
+  font-size: 8px;
+}
+
+.connector {
+  width: 1px;
+  height: 34px;
+  position: relative;
+  background: #34384d;
+}
+
+.connector svg {
+  width: 12px;
+  position: absolute;
+  left: -6px;
+  bottom: -6px;
+  padding: 2px;
+  border-radius: 50%;
+  background: #090b1a;
+  color: #626879;
+}
+
+.branches {
+  width: min(100%, 820px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.settings {
+  background: #080a19;
+}
+
+/* ------------------------------------------------------------------ */
+/* Matters / vault                                                     */
+/* ------------------------------------------------------------------ */
+
+.matter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.matter-grid > button {
+  min-height: 184px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px 1fr 16px;
+  align-items: start;
+  gap: 11px;
+  padding: 18px;
+  border: 1px solid #222638;
+  border-radius: 12px;
+  background: #080a19;
+  color: inherit;
+  text-align: left;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.matter-grid > button:hover {
+  transform: translateY(-2px);
+  border-color: #373b50;
+  background: #0d1020;
+}
+
+.matter-grid > button > i {
+  color: #5f6575;
+  font: 10px "Iowan Old Style", Georgia, serif;
+  font-style: normal;
+}
+
+.matter-grid > button > div {
+  min-width: 0;
+}
+
+.matter-grid h2 {
+  margin: 18px 0 3px;
+  color: #edf0f4;
+  font: 520 24px "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.03em;
+}
+
+.matter-grid p {
+  margin: 0;
+  color: #7a808f;
+  font-size: 9px;
+}
+
+.matter-grid small {
+  margin-top: 27px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  color: #6f7585;
+  font-size: 8px;
+}
+
+.matter-grid small svg {
+  width: 11px;
+}
+
+.matter-grid > button > svg {
+  width: 13px;
+  position: absolute;
+  right: 15px;
+  bottom: 15px;
+  color: #5e6474;
+}
+
+.vault-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 350px;
+  gap: 12px;
+}
+
+.vault-grid > section,
+.vault-grid > aside {
+  border: 1px solid #222638;
+  border-radius: 12px;
+  background: #080a19;
+  overflow: hidden;
+}
+
+.vault-grid > section > button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 0;
+  border-bottom: 1px solid #181c2d;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.vault-grid > section > button:hover {
+  background: #0e1120;
+}
+
+.vault-grid > section > button > i {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #292d41;
+  border-radius: 9px;
+  background: #121526;
+}
+
+.vault-grid > section svg {
+  width: 14px;
+  color: #979dac;
+}
+
+.vault-grid > section > button > span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vault-grid > section b {
+  color: #d9dde5;
+  font-size: 10px;
+}
+
+.vault-grid > section small {
+  overflow: hidden;
+  color: #6b7180;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-grid > section > button > svg {
+  width: 12px;
+  color: #5f6575;
+}
+
+.vault-grid > aside {
+  padding: 24px;
+  align-self: start;
+}
+
+.vault-grid > aside > svg {
+  width: 22px;
+  color: var(--le-success);
+}
+
+.vault-grid > aside h2 {
+  margin: 15px 0 8px;
+  color: #e8eaf0;
+  font: 520 25px "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.03em;
+}
+
+.vault-grid > aside p {
+  margin: 0 0 20px;
+  color: #7b8190;
+  font-size: 10px;
+  line-height: 1.58;
+}
+
+.vault-grid > aside > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid #1b1f30;
+}
+
+.vault-grid > aside span {
+  color: #6c7281;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.vault-grid > aside b {
+  color: #b8bdc8;
+  font-size: 8px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------------ */
+/* Trust                                                               */
+/* ------------------------------------------------------------------ */
+
+.trust-view {
+  min-height: calc(100svh - 89px);
+  padding-bottom: 70px;
+}
+
+.trust-hero {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 58px 5vw 46px;
+  border-bottom: 1px solid var(--le-line-soft);
+  background:
+    radial-gradient(circle at 78% 16%, rgba(120,130,174,.11), transparent 27rem),
+    linear-gradient(180deg, #050617, #040517);
+}
+
+.trust-hero h1 {
+  max-width: 760px;
+  margin: 15px 0 12px;
+  color: #f1f3f7;
+  font: 500 clamp(48px, 6.5vw, 88px)/.94 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.055em;
+}
+
+.trust-hero p {
+  max-width: 690px;
+  margin: 0;
+  color: #9ca2b0;
+  font: 16px/1.55 "Iowan Old Style", Georgia, serif;
+}
+
+.trust-hero > div {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.trust-layout {
+  width: min(100% - 48px, 1380px);
+  margin: 26px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 12px;
+}
+
+.trust-layout > section,
+.trust-layout > aside {
+  border: 1px solid #222638;
+  border-radius: 12px;
+  background: #080a19;
+  overflow: hidden;
+}
+
+.trust-heading {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-bottom: 1px solid #1b1f30;
+  color: #969cab;
+  font-size: 9px;
+  font-weight: 670;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.trust-heading small {
+  color: #5f6575;
+  font-size: 8px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 14px;
+  border-bottom: 1px solid #181c2d;
+}
+
+.control-row > i {
+  width: 33px;
+  height: 33px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #292d41;
+  border-radius: 9px;
+  background: #121526;
+}
+
+.control-row > i svg {
+  width: 14px;
+  color: #9ba1b0;
+}
+
+.control-row b {
+  color: #d6dae3;
+  font-size: 10px;
+}
+
+.control-row p {
+  margin: 3px 0 0;
+  color: #707686;
+  font-size: 8px;
+}
+
+.control-row > svg {
+  width: 12px;
+  color: #5c6272;
+}
+
+.trust-layout > aside {
+  align-self: start;
+  padding: 23px;
+}
+
+.trust-layout > aside h2 {
+  margin: 12px 0 7px;
+  color: #e8eaf0;
+  font: 520 27px "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.03em;
+}
+
+.trust-layout > aside > p {
+  margin: 0 0 19px;
+  color: #7c8291;
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.readiness {
+  margin: 14px 0;
+}
+
+.readiness > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  color: #949aa8;
+  font-size: 9px;
+}
+
+.readiness b {
+  color: #c5cad4;
+  font-size: 8px;
+}
+
+.trust-layout > aside footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 19px;
+  padding: 11px;
+  border: 1px solid #3b3024;
+  border-radius: 9px;
+  background: #17130e;
+  color: #9c876e;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.trust-layout > aside footer svg {
+  width: 13px;
+  flex: 0 0 auto;
+  color: var(--le-warn);
+}
+
+/* ------------------------------------------------------------------ */
+/* Review                                                              */
+/* ------------------------------------------------------------------ */
+
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: stretch;
+  gap: 1px;
+  margin-bottom: 11px;
+  overflow: hidden;
+  border: 1px solid #222638;
+  border-radius: 11px;
+  background: #222638;
+}
+
+.review-summary > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: #090b1a;
+}
+
+.review-summary span {
+  color: #6f7585;
+  font-size: 8px;
+  font-weight: 670;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.review-summary b {
+  overflow: hidden;
+  color: #d1d5de;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-summary > button {
+  margin: 8px;
+  align-self: center;
+}
+
+.view-pad > textarea[aria-label="Contract text for review"] {
+  min-height: 170px;
+  border-color: #24283b;
+  background: #090b1a;
+  color: #c9ced8;
+  font: 13px/1.68 "Iowan Old Style", Georgia, serif;
+}
+
+.findings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 11px;
+}
+
+.findings > button {
+  min-height: 214px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 5px 1fr 14px;
+  gap: 11px;
+  padding: 16px;
+  border: 1px solid #222638;
+  border-radius: 11px;
+  background: #080a19;
+  color: inherit;
+  text-align: left;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.findings > button:hover {
+  transform: translateY(-2px);
+  border-color: #373b50;
+  background: #0d1020;
+}
+
+.findings > button > i {
+  width: 3px;
+  height: 42px;
+  margin-top: 2px;
+  border-radius: 4px;
+  background: #6e7483;
+}
+
+.findings > button > i.high {
+  background: var(--le-danger);
+}
+
+.findings > button > i.medium {
+  background: var(--le-warn);
+}
+
+.findings > button > i.low {
+  background: var(--le-success);
+}
+
+.findings > button > span {
+  min-width: 0;
+}
+
+.findings h3 {
+  margin: 15px 0 8px;
+  color: #e8eaf0;
+  font: 520 20px/1.16 "Iowan Old Style", Georgia, serif;
+  letter-spacing: -.025em;
+}
+
+.findings p {
+  margin: 0;
+  color: #858b9a;
+  font-size: 10px;
+  line-height: 1.58;
+}
+
+.findings small {
+  position: absolute;
+  left: 31px;
+  right: 31px;
+  bottom: 15px;
+  color: #5f6575;
+  font-size: 8px;
+}
+
+.findings > button > svg {
+  width: 12px;
+  color: #5f6575;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dialogs, sheets and auth                                            */
+/* ------------------------------------------------------------------ */
+
+.command-dialog {
+  border-color: #2b2f43 !important;
+  background: #090b1a !important;
+  color: #e9ebf1 !important;
+  box-shadow: 0 30px 100px rgba(0,0,0,.55) !important;
+}
+
+.command-search {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #282c40;
+  border-radius: 9px;
+  background: #0f1222;
+}
+
+.command-search > svg {
+  width: 14px;
+  color: #717787;
+}
+
+.command-search input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #eef0f4;
+}
+
+.command-list {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+}
+
+.command-list button {
+  display: grid;
+  grid-template-columns: 25px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #aeb4c1;
+  text-align: left;
+}
+
+.command-list button:hover {
+  border-color: #25293d;
+  background: #111426;
+  color: #eef0f4;
+}
+
+.command-list svg {
+  width: 14px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 11px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 5px;
+  color: #9da3b1;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: .04em;
+}
+
+.auth-form input {
+  height: 38px;
+  border-color: #292d42;
+  background: #0f1222;
+  color: #eef0f4;
+}
+
+.auth-session {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #292d41;
+  border-radius: 10px;
+  background: #0f1222;
+}
+
+.auth-session > svg {
+  width: 18px;
+  color: var(--le-success);
+}
+
+.auth-session > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.auth-session b {
+  color: #dfe2e9;
+  font-size: 10px;
+}
+
+.auth-session span {
+  color: #707686;
+  font-size: 8px;
+}
+
+.source-sheet {
+  width: min(100%, 390px) !important;
+  padding: 0 !important;
+  border-left-color: #25293c !important;
+  background: #090b1a !important;
+}
+
+.source-sheet .source-viewer {
+  height: 100svh;
+  position: static;
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion                                                              */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: no-preference) {
+  .view-pad,
+  .research-page,
+  .draft-view,
+  .tables-view,
+  .trust-view {
+    animation: le-fade-in .22s ease-out both;
+  }
+
+  @keyframes le-fade-in {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive behavior                                                 */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1280px) {
+  .research-grid {
+    grid-template-columns: 220px minmax(450px, 1fr) 300px;
+  }
+
+  .editor-grid {
+    grid-template-columns: 190px minmax(500px, 1fr) 292px;
+  }
+
+  .corpus-ops {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 1080px) {
+  .research-grid {
+    grid-template-columns: 215px minmax(0, 1fr);
+  }
+
+  .research-grid > .source-viewer {
+    display: none;
+  }
+
+  .editor-grid {
+    grid-template-columns: 176px minmax(0, 1fr);
+  }
+
+  .editor-grid > .ai-pane {
+    display: none;
+  }
+
+  .agent-grid,
+  .vault-grid,
+  .trust-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .trust-layout > aside {
+    width: 100%;
+  }
+
+  .corpus-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .workflow-canvas {
+    grid-template-columns: 102px minmax(0, 1fr);
+  }
+
+  .workflow-canvas > .settings {
+    display: none;
+  }
+
+  .findings {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 820px) {
+  .context-head {
+    height: 54px;
+    padding-right: 10px;
+  }
+
+  .context-head > div:last-child .privacy-pill,
+  .context-head > div:last-child .clock,
+  .context-head > div:last-child button[class*="inline-flex"] span,
+  .context-head > div:last-child kbd {
+    display: none;
+  }
+
+  .system-bar {
+    display: none;
+  }
+
+  .view-pad {
+    padding: 26px 18px 42px;
+  }
+
+  .section-header {
+    align-items: flex-start;
+  }
+
+  .section-header h1 {
+    font-size: 34px;
+  }
+
+  .research-page {
+    min-height: calc(100svh - 54px);
+  }
+
+  .research-grid {
+    min-height: auto;
+    display: block;
+    background: var(--le-midnight);
+  }
+
+  .plan-pane {
+    display: none;
+  }
+
+  .answer-content {
+    padding: 36px 26px 52px;
+  }
+
+  .answer-content h2 {
+    font-size: 32px;
+  }
+
+  .answer-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ask-view {
+    padding-top: 45px;
+  }
+
+  .ask-view .section-header h1 {
+    font-size: 52px;
+  }
+
+  .prompt-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .editor-grid {
+    display: block;
+  }
+
+  .outline-pane {
+    display: none;
+  }
+
+  .doc-canvas {
+    padding: 24px 14px 48px;
+  }
+
+  .doc-page {
+    min-height: 0;
+    padding: 42px 32px;
+  }
+
+  .skills-grid,
+  .monitor-grid,
+  .workflow-canvas {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .skill-list > button {
+    border-right: 1px solid #171b2b;
+  }
+
+  .monitor-grid > aside,
+  .workflow-canvas > aside:first-child {
+    display: none;
+  }
+
+  .matter-grid,
+  .findings {
+    grid-template-columns: 1fr;
+  }
+
+  .review-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .review-summary > button {
+    grid-column: 1 / -1;
+  }
+
+  .trust-hero {
+    min-height: 330px;
+    padding: 48px 24px 38px;
+  }
+
+  .trust-hero h1 {
+    font-size: 56px;
+  }
+
+  .trust-layout {
+    width: min(100% - 28px, 1380px);
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 12px;
+  }
+
+  .context-head > div:first-child > span {
+    max-width: 180px;
+  }
+
+  .research-bar {
+    height: 55px;
+  }
+
+  .research-bar .tone-badge {
+    display: none;
+  }
+
+  .answer-head {
+    padding: 0 13px;
+  }
+
+  .answer-head .verified {
+    display: none;
+  }
+
+  .answer-content {
+    padding: 31px 20px 46px;
+  }
+
+  .answer-content h2 {
+    font-size: 29px;
+  }
+
+  .answer-content .standfirst {
+    font-size: 16px;
+  }
+
+  .ask-view .section-header h1 {
+    font-size: 44px;
+  }
+
+  .composer {
+    padding: 11px;
+  }
+
+  .composer textarea {
+    min-height: 110px;
+    font-size: 17px;
+  }
+
+  .composer .spread {
+    align-items: flex-end;
+  }
+
+  .options button:nth-child(n+2) {
+    display: none;
+  }
+
+  .prompt-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-grid > button {
+    min-height: 118px;
+  }
+
+  .recent > button {
+    grid-template-columns: 36px 1fr 14px;
+  }
+
+  .recent time {
+    display: none;
+  }
+
+  .doc-toolbar,
+  .page-toolbar {
+    padding: 10px 12px;
+  }
+
+  .doc-toolbar .row > button:first-of-type,
+  .page-toolbar .row > button:first-of-type {
+    display: none;
+  }
+
+  .doc-page {
+    padding: 34px 22px;
+  }
+
+  .doc-page h1 {
+    font-size: 32px;
+  }
+
+  .table-toolbar {
+    grid-template-columns: auto auto 1fr;
+    overflow-x: auto;
+  }
+
+  .table-toolbar > button:nth-of-type(3),
+  .table-toolbar > small,
+  .table-toolbar > button ~ span {
+    display: none;
+  }
+
+  .list-summary,
+  .review-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .list-summary small {
+    display: none;
+  }
+
+  .corpus-strip,
+  .corpus-ops,
+  .skill-list,
+  .skill-detail > footer,
+  .branches {
+    grid-template-columns: 1fr;
+  }
+
+  .run-head {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .run-head .tone-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .skill-head {
+    flex-direction: column;
+  }
+
+  .skill-head > button {
+    width: 100%;
+  }
+
+  .control-row {
+    grid-template-columns: 34px minmax(0, 1fr) 14px;
+  }
+
+  .control-row .tone-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .trust-hero {
+    min-height: 300px;
+    padding: 39px 18px 30px;
+  }
+
+  .trust-hero h1 {
+    font-size: 46px;
+  }
+
+  .trust-hero p {
+    font-size: 14px;
+  }
+
+  .trust-hero > div {
+    flex-direction: column;
+  }
+
+  .trust-hero > div > button {
+    width: 100%;
+  }
+}
