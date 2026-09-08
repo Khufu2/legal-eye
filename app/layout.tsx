@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./editorial.css";
 import "./polish.css";
+import "./consensus.css";
 
 export const metadata: Metadata = {
   title: "Legal Eye — Legal Intelligence",
@@ -10,6 +11,11 @@ export const metadata: Metadata = {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f6f8f7",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
