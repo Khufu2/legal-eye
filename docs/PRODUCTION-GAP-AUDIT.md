@@ -1,6 +1,6 @@
 # Legal Eye production gap audit
 
-Audit date: **2026-09-07**. Target: a defensible enterprise legal-intelligence product suitable
+Audit date: **2026-09-08**. Target: a defensible enterprise legal-intelligence product suitable
 for a global bank or top-tier firm. This audit separates implemented foundations from operationally
 proven capabilities. A screen or database table does not count as a working product capability.
 
@@ -17,13 +17,13 @@ organization and owner exist; real client matters and firm work product do not.
 
 | Objective | Implemented | Missing before production acceptance |
 | --- | --- | --- |
-| Premium connected UI | Research, Editor, Review, Tables, Agent, Skills, Workflows, Lists, Matters, Vault and Monitor interaction prototype | Real authentication/session, database-backed mutations, permissions-aware states, accessibility/browser QA, telemetry and error recovery |
+| Premium connected UI | Authenticated cited Research, AI-assisted clause drafting, pasted-text contract Review, private Vault upload/queue, live corpus Monitor, plus Editor, Tables, Agent, Skills, Workflows, Lists and Matters interaction surfaces | Persisted research/draft/review work product, database-backed mutations across remaining surfaces, permissions-aware states, accessibility QA and collaborative error recovery |
 | OpenContracts | Audited MIT commit, adapter contract and Cloud Build boundary | Running API/workers, dedicated database/Redis, tenant adapter, migrations, health/load/contract tests and upstream security hardening |
-| Docling | Private parser service plus a bounded queue worker with policy recheck, host/MIME/signature limits, mandatory malware-scanner gate, leases, heartbeat, retry/dead-letter handling, canonical artifacts and exact-span chunk mapping | Apply the migration, deploy the signed private image and scanner, drain a controlled batch, then complete golden-document, load and recovery tests |
+| Docling | Live queue/artifact/chunk schema plus a private parser service and bounded worker with policy recheck, host/MIME/signature limits, mandatory malware-scanner gate, leases, heartbeat, retry/dead-letter handling, canonical artifacts and exact-span chunk mapping | Deploy the signed private image and scanner, drain a controlled batch, then complete golden-document, load and recovery tests |
 | LangGraph | Inspectable plan/execute/review/deliver service with human checkpoint | Running service, durable queue/retry/idempotency, token exchange, cancellation, failure injection, observability and recovery drills |
 | Public corpus | 136 registered sources; Tanzania OAG, UK and EUR-Lex policy-approved; 5,765 governed metadata records | Completed PDF retrieval, structural CLML/AKN/CELLAR parsing, cases, courts, citations, versions, amendments, authority treatment, embeddings and reconciliation |
 | African moat | 5,495 official Tanzania OAG catalogue records, 30 jurisdictions and 12 parser plug-in registrations | Process the queued PDFs, ingest judgments/Gazettes, build court hierarchy, citation fixtures, treatment graph and lawyer QA |
-| Legal research | Hybrid retrieval functions and evidence-first API design | Searchable evidence corpus, temporal/authority ranking benchmarks, real citation verification, saved sessions and live three-pane state |
+| Legal research | Authenticated evidence-gated Vercel AI Gateway flow, hybrid retrieval, public/private separation, DLP and generation audit hashes | Searchable evidence corpus, temporal/authority ranking benchmarks, real citation verification and persisted research sessions |
 | Drafting/editor | Premium editor prototype and template-licence schema | DOCX round-trip, track changes, styles, comments, version merge, template importer, clause bank, playbook enforcement and Word add-in |
 | Tabular Review | Source-linked grid prototype | Upload/VDR ingest, job fan-out, persisted columns/cells, reviewer locks, confidence calibration, bulk retry, export and collaborative review |
 | Agent/Skills/Workflows | Schemas, visible execution UX and service implementation | Persisted production runs, executable tools, version promotion, regression tests, permissions, schedules, approval routing and cost controls |
@@ -45,7 +45,7 @@ organization and owner exist; real client matters and firm work product do not.
 - Zero legal text chunks, authorities, citation edges, legislation works/expressions, private
   documents, matters, review projects, agent runs, workflows, monitors, SSO providers, SCIM tokens,
   evaluation runs, security-test runs or compliance-evidence records exist.
-- Six Edge Functions are active. `legal-api` is JWT-protected; `legal-scim` uses a custom SCIM
+- Nine Edge Functions are active. `legal-api` is JWT-protected; `legal-scim` uses a custom SCIM
   bearer-token boundary. AI providers remain disabled until secrets and contractual controls pass.
 - Supabase reports one security warning: leaked-password protection is disabled. Performance advice
   still includes unindexed foreign keys and overlapping permissive RLS policies that must be
@@ -55,16 +55,20 @@ organization and owner exist; real client matters and firm work product do not.
   findings; four moderate development-only findings remain through Drizzle Kit's legacy esbuild
   loader and require an upstream-safe migration rather than a forced downgrade.
 
-## 2026-09-07 verification delta
+## 2026-09-08 verification delta
 
 - A read-only public Data API check reconfirmed 5,495 Tanzania, 20 UK and 250 EU catalogue records
   (5,765 total) and zero publicly readable `document_chunks`, `authorities` and `citation_edges`.
-- Anonymous access correctly cannot establish the privileged ingestion queue count. A connected
-  Supabase operator session is still required to verify queued, leased, failed and dead-letter totals
-  and to run the database security/performance advisors.
-- Durable Docling worker and schema changes are implemented in source but are **not operational
-  evidence** until the migration and Edge Function are deployed and a controlled parsed batch is
-  inspected in the live database.
+- The durable processing migration is applied in production. Operator verification found 5,745
+  queued jobs, zero dead-lettered jobs, four worker RPCs, and zero extracted legal chunks/artifacts.
+- `legal-process-document`, `legal-corpus-ingest`, and the hardened `legal-api` were redeployed to
+  the Legal project. The API accepts modern Supabase key formats and restricts browser CORS to the
+  production Legal Eye origin.
+- The Next.js application now uses Vercel AI Gateway through OIDC for authenticated research,
+  drafting and structured review. Research remains evidence-gated; no verified chunks means no
+  synthesized legal conclusion. Requests are attributed per user and generation hashes/usage are
+  recorded without persisting prompt or response content.
+- The native Next.js production build, TypeScript and direct ESLint checks pass on Windows.
 - No GCP project/runtime credentials or malware-scanner endpoint were available in this checkout;
   the worker therefore remains intentionally undeployed and fail-closed.
 

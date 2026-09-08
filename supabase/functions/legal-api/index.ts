@@ -1,12 +1,26 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
+function bundledKey(name:string){
+  const raw=Deno.env.get(name);
+  if(!raw) return "";
+  try{
+    const values=JSON.parse(raw) as Record<string,unknown>;
+    const candidate=values.default||Object.values(values).find(value=>typeof value==="string");
+    return typeof candidate==="string"?candidate:"";
+  }catch{return "";}
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON = Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||bundledKey("SUPABASE_PUBLISHABLE_KEYS")||Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE = Deno.env.get("SUPABASE_SECRET_KEY")||bundledKey("SUPABASE_SECRET_KEYS")||Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+if(!SUPABASE_URL||!ANON||!SERVICE) throw new Error("Supabase runtime configuration is incomplete");
+const WEB_ORIGIN=Deno.env.get("LEGAL_EYE_WEB_ORIGIN")||"https://legal-eye-six.vercel.app";
 const cors = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": WEB_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+  "Vary": "Origin",
 };
 
 function json(data: unknown, status=200) {
@@ -50,10 +64,14 @@ async function sha256(value:string){
   return Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("");
 }
 
+function serviceHeaders(extra:Record<string,string>={}){
+  return {apikey:SERVICE,...(!SERVICE.startsWith("sb_")?{authorization:`Bearer ${SERVICE}`} : {}),...extra};
+}
+
 async function serviceInsert(table:string,row:Record<string,unknown>){
   const r=await fetch(`${SUPABASE_URL}/rest/v1/${table}`,{
     method:"POST",
-    headers:{apikey:SERVICE,authorization:`Bearer ${SERVICE}`,"content-type":"application/json",Prefer:"return=minimal"},
+    headers:serviceHeaders({"content-type":"application/json",Prefer:"return=minimal"}),
     body:JSON.stringify(row),
   });
   if(!r.ok) throw new Error(`Telemetry insert failed: ${table}`);
@@ -61,7 +79,7 @@ async function serviceInsert(table:string,row:Record<string,unknown>){
 
 async function enabledProviders(){
   const r=await fetch(`${SUPABASE_URL}/rest/v1/ai_provider_registry?select=provider_key,priority,model_name,data_classification_ceiling&enabled=is.true&order=priority`,{
-    headers:{apikey:SERVICE,authorization:`Bearer ${SERVICE}`},
+    headers:serviceHeaders(),
   });
   if(!r.ok) throw new Error("AI provider registry unavailable");
   return await r.json() as Array<{provider_key:"gemini"|"openrouter";priority:number;model_name:string;data_classification_ceiling:Classification}>;
@@ -139,7 +157,7 @@ async function routeModel(system:string,prompt:string,ctx:ModelContext) {
         response=await fetch("https://openrouter.ai/api/v1/chat/completions",{
           method:"POST",signal:AbortSignal.timeout(timeoutMs),
           headers:{authorization:`Bearer ${provider.secret}`,"content-type":"application/json",
-            "HTTP-Referer":Deno.env.get("OPENROUTER_SITE_URL")||"https://legal-eye.truckai-co.chatgpt.site",
+            "HTTP-Referer":Deno.env.get("OPENROUTER_SITE_URL")||WEB_ORIGIN,
             "X-OpenRouter-Title":Deno.env.get("OPENROUTER_APP_NAME")||"Legal Eye"},
           body:JSON.stringify({model:provider.model,temperature:0.1,max_tokens:maxOutputTokens,
             messages:[{role:"system",content:system},{role:"user",content:dlp.sanitized}],
@@ -201,6 +219,25 @@ Deno.serve(async (req:Request)=>{
       action,auth,userId:user.id,organizationId:input.organization_id,matterId:input.matter_id,
       classification,structured,
     });
+
+    if(action==="record_gateway_generation"){
+      if(!input.organization_id) return json({error:"Organization required"},400);
+      const promptHash=String(input.prompt_sha256||"");
+      const responseHash=String(input.response_sha256||"");
+      if(!/^[a-f0-9]{64}$/.test(promptHash)||!/^[a-f0-9]{64}$/.test(responseHash)) return json({error:"Invalid generation digest"},400);
+      await recordGeneration({
+        action:String(input.source_action||"gateway"),auth,userId:user.id,organizationId:input.organization_id,
+        classification:"confidential",structured:false,
+      },{
+        provider_key:null,model_name:String(input.model_name||"unknown"),outcome:"success",
+        prompt_sha256:promptHash,response_sha256:responseHash,
+        input_tokens:Number.isFinite(input.input_tokens)?Math.max(0,Math.floor(input.input_tokens)):null,
+        output_tokens:Number.isFinite(input.output_tokens)?Math.max(0,Math.floor(input.output_tokens)):null,
+        latency_ms:Math.min(Math.max(Number(input.latency_ms)||0,0),300000),dlp_decision:"allow",
+        metadata:{provider_key:"vercel_gateway",transport:"vercel-ai-gateway",content_persisted:false},
+      });
+      return json({recorded:true});
+    }
 
     if(action==="research"){
       const query=String(input.query||"").trim();

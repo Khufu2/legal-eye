@@ -80,6 +80,30 @@ create table if not exists public.legal_document_chunks (
   unique (artifact_id, source_node_ref)
 );
 
+-- Earlier Legal Eye releases created a smaller bigint-keyed chunk table. Upgrade it in place
+-- instead of replacing it so any already-ingested source text remains available.
+alter table public.legal_document_chunks
+  add column if not exists artifact_id uuid references public.legal_document_artifacts(id) on delete cascade,
+  add column if not exists source_node_ref text,
+  add column if not exists parent_node_ref text,
+  add column if not exists node_type text not null default 'text',
+  add column if not exists reading_order integer,
+  add column if not exists bounding_boxes jsonb not null default '[]'::jsonb,
+  add column if not exists start_offset integer,
+  add column if not exists end_offset integer,
+  add column if not exists language_code text,
+  add column if not exists extraction_confidence numeric(5,4),
+  add column if not exists ocr_provenance jsonb not null default '{}'::jsonb,
+  add column if not exists search_vector tsvector generated always as (to_tsvector('simple', content)) stored;
+
+update public.legal_document_chunks
+set source_node_ref = coalesce(source_node_ref, 'legacy:' || id::text),
+    reading_order = coalesce(reading_order, 0)
+where source_node_ref is null or reading_order is null;
+
+create unique index if not exists legal_document_chunks_artifact_source_node_unique
+  on public.legal_document_chunks(artifact_id, source_node_ref);
+
 create index if not exists legal_document_chunks_document_order_idx
   on public.legal_document_chunks(legal_document_id, reading_order);
 create index if not exists legal_document_chunks_artifact_idx
@@ -110,7 +134,9 @@ create index if not exists ingestion_job_events_org_created_idx
 alter table public.legal_document_artifacts enable row level security;
 alter table public.legal_document_chunks enable row level security;
 alter table public.ingestion_job_events enable row level security;
+alter table public.ingestion_jobs enable row level security;
 
+drop policy if exists legal_document_artifacts_public_read on public.legal_document_artifacts;
 create policy legal_document_artifacts_public_read
   on public.legal_document_artifacts for select to anon, authenticated
   using (
@@ -124,6 +150,8 @@ create policy legal_document_artifacts_public_read
     )
   );
 
+drop policy if exists legal_chunks_read on public.legal_document_chunks;
+drop policy if exists legal_document_chunks_public_read on public.legal_document_chunks;
 create policy legal_document_chunks_public_read
   on public.legal_document_chunks for select to anon, authenticated
   using (
@@ -137,6 +165,7 @@ create policy legal_document_chunks_public_read
     )
   );
 
+drop policy if exists ingestion_job_events_org_read on public.ingestion_job_events;
 create policy ingestion_job_events_org_read
   on public.ingestion_job_events for select to authenticated
   using (
@@ -144,11 +173,22 @@ create policy ingestion_job_events_org_read
     and (select private.is_org_member(ingestion_job_events.organization_id))
   );
 
+drop policy if exists ingestion_read on public.ingestion_jobs;
+drop policy if exists ingestion_jobs_org_read on public.ingestion_jobs;
+create policy ingestion_jobs_org_read
+  on public.ingestion_jobs for select to authenticated
+  using (
+    ingestion_jobs.organization_id is not null
+    and (select private.is_org_member(ingestion_jobs.organization_id))
+  );
+
 grant select on public.legal_document_artifacts, public.legal_document_chunks to anon, authenticated;
 grant select, insert, update, delete on public.legal_document_artifacts, public.legal_document_chunks to service_role;
 grant select, insert on public.ingestion_job_events to service_role;
 grant usage, select on sequence public.ingestion_job_events_id_seq to service_role;
 grant select, insert, update on public.ingestion_jobs to service_role;
+revoke all on public.ingestion_jobs from anon;
+grant select on public.ingestion_jobs to authenticated;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
