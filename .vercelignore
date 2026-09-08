@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.git
+.agents
+.codex
+.next
+node_modules
+coverage
+dist
+work
+outputs
+*.log
+*.tsbuildinfo
+__pycache__
+*.pyc
