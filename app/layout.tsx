@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./editorial.css";
+import "./polish.css";
 
 export const metadata: Metadata = {
   title: "Legal Eye — Legal Intelligence",
