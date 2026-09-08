@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./editorial.css";
 
 export const metadata: Metadata = {
-  title: "Legal Eye — Global Legal Intelligence",
-  description: "Global legal intelligence, built from Africa. Research, draft, review and automate complex legal work with verifiable authority.",
+  title: "Legal Eye — Legal Intelligence",
+  description: "Legal intelligence built from Africa for serious global practice. Research, draft, review and automate complex legal work with verifiable authority.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
