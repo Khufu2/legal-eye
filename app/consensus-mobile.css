@@ -1,0 +1,6 @@
+@media (max-width: 820px) {
+  .composer {
+    left: calc(16px + env(safe-area-inset-left));
+    right: calc(16px + env(safe-area-inset-right));
+  }
+}
