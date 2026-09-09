@@ -3,7 +3,6 @@ import "./globals.css";
 import "./editorial.css";
 import "./polish.css";
 import "./consensus.css";
-import "./consensus-mobile.css";
 
 export const metadata: Metadata = {
   title: "Legal Eye — Legal Intelligence",
@@ -15,8 +14,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f6f8f7",
-  colorScheme: "light",
+  themeColor: "#242426",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({

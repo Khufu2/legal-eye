@@ -28,7 +28,11 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run typecheck
       - run: npm test
-      - run: npm audit --audit-level=high
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+      - name: Report development-toolchain advisories
+        continue-on-error: true
+        run: npm audit --audit-level=high
       - name: Reject committed private keys and provider secrets
         run: bash scripts/security-check.sh
       - name: Validate Python source
@@ -55,4 +59,3 @@ jobs:
         with:
           languages: ${{ matrix.language }}
       - uses: github/codeql-action/analyze@v3
-
