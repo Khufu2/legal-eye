@@ -3,6 +3,7 @@ import "./globals.css";
 import "./editorial.css";
 import "./polish.css";
 import "./consensus.css";
+import "./hallmark.css";
 
 export const metadata: Metadata = {
   title: "Legal Eye — Legal Intelligence",
