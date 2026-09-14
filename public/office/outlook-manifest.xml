@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="MailApp">
+  <Id>c5fe7628-c9b5-4b1a-b3e8-1dfb8e6d8f6d</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>Legal Eye</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Legal Eye for Outlook"/>
+  <Description DefaultValue="Summarize threads, draft replies and turn email into governed legal work."/>
+  <SupportUrl DefaultValue="https://legal-eye-six.vercel.app"/>
+  <AppDomains><AppDomain>https://legal-eye-six.vercel.app</AppDomain></AppDomains>
+  <Hosts><Host Name="Mailbox"/></Hosts>
+  <Requirements><Sets><Set Name="Mailbox" MinVersion="1.8"/></Sets></Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead"><DesktopSettings><SourceLocation DefaultValue="https://legal-eye-six.vercel.app/office/outlook"/><RequestedHeight>450</RequestedHeight></DesktopSettings></Form>
+    <Form xsi:type="ItemEdit"><DesktopSettings><SourceLocation DefaultValue="https://legal-eye-six.vercel.app/office/outlook"/></DesktopSettings></Form>
+  </FormSettings>
+  <Permissions>ReadWriteMailbox</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+</OfficeApp>
