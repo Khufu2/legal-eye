@@ -22,11 +22,12 @@ jobs:
         run: npm install --save-exact unpdf@1.8.1
       - name: Apply official-source fallback
         run: python scripts/apply_public_source_fallback.py
-      - name: Validate application
-        run: |
-          npm run typecheck
-          npm test
-          git diff --check
+      - name: Typecheck fallback
+        run: npm run typecheck
+      - name: Test application
+        run: npm test
+      - name: Validate diff
+        run: git diff --check
       - name: Commit changes
         run: |
           if git diff --quiet; then exit 0; fi
