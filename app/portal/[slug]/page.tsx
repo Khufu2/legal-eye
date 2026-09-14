@@ -1,6 +1,6 @@
-import { PortalGuest } from "@/components/legal-eye-portal";
+import { PortalGuestPro } from "@/components/legal-eye-portal-guest";
 
 export default async function ClientPortalPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return <PortalGuest slug={slug} />;
+  return <PortalGuestPro slug={slug} />;
 }
