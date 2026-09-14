@@ -519,7 +519,7 @@ def enforce_public_source_policy(api: SupabaseApi, source_id: str) -> dict[str, 
 
 def fetch_official_structured(url: str, allowed_hosts: set[str], accept: str = "application/xml", language: str | None = None) -> tuple[str, str, str]:
     parsed = urlparse(url)
-    if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in allowed_hosts:
         raise PipelineError("source_host_mismatch", "Structured source URL failed source policy", False)
     headers = {"user-agent": "LegalEye/0.4 governed-corpus-worker", "accept": accept}
     if language:
@@ -531,7 +531,7 @@ def fetch_official_structured(url: str, allowed_hosts: set[str], accept: str = "
     if response.status_code >= 400:
         raise PipelineError("upstream_fetch_failed", f"Approved structured source returned {response.status_code}", response.status_code >= 500 or response.status_code == 429)
     final = urlparse(str(response.url))
-    if final.scheme != "https" or final.hostname not in allowed_hosts:
+    if final.scheme not in {"http", "https"} or final.hostname not in allowed_hosts:
         raise PipelineError("source_host_mismatch", "Structured source redirected outside approved official hosts", False)
     raw = response.text
     if not raw.strip():
@@ -595,10 +595,12 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
     work_uri = str(payload.get("work_uri") or "").strip()
     if not work_uri:
         raise PipelineError("eurlex_identifier_missing", "EUR-Lex job lacks a CELLAR work URI", False)
-    if work_uri.startswith("http://"):
-        work_uri = "https://" + work_uri.removeprefix("http://")
+    # CELLAR publishes canonical resource URIs over HTTP and performs controlled
+    # content-negotiation redirects. Preserve that official URI instead of forcing HTTPS.
+    separator = "&" if "?" in work_uri else "?"
+    request_uri = f"{work_uri}{separator}language=eng"
     raw, content_type, resolved_url = fetch_official_structured(
-        work_uri,
+        request_uri,
         {"publications.europa.eu", "op.europa.eu"},
         "application/xhtml+xml, application/xml;q=0.9, text/xml;q=0.8",
         "eng",
