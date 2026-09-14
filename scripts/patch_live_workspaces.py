@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# one-shot patch trigger
 page = Path('app/page.tsx')
 text = page.read_text()
 needle = 'import { Toaster } from "@/components/ui/sonner";\nimport { toast } from "sonner";\n'
