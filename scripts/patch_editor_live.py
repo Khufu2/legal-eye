@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# one-shot trigger
 page=Path('app/page.tsx')
 text=page.read_text()
 old='import { AgentLive, ListsLive, MattersLive, MonitorsLive, SkillsLive, TablesLive, WorkflowsLive } from "@/components/legal-eye-live";\n'
