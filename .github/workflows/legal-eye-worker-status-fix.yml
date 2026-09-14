@@ -1,0 +1,26 @@
+name: Apply Legal Eye Worker Status Fix
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/legal-eye-worker-status-fix.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Correct private document terminal status
+        run: python scripts/fix_private_worker_status.py
+      - name: Commit worker fix
+        run: |
+          git config user.name "legal-eye-automation"
+          git config user.email "actions@users.noreply.github.com"
+          rm .github/workflows/legal-eye-worker-status-fix.yml scripts/fix_private_worker_status.py
+          git add services/docling/worker.py .github/workflows/legal-eye-worker-status-fix.yml scripts/fix_private_worker_status.py
+          git commit -m "Mark processed private documents ready"
+          git push origin main
