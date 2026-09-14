@@ -149,3 +149,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .vault-document > i { display:grid; place-items:center; flex:0 0 36px; height:36px; border-radius:10px; border:1px solid var(--le-soft-border); }
 .vault-document > span { display:grid; gap:4px; min-width:0; }
 .vault-document b, .vault-document small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.monitor-grid > aside > div { display:flex; align-items:center; gap:12px; min-height:58px; padding:12px 14px; border-radius:10px; }
+.monitor-grid > aside > div > span { display:grid; gap:3px; min-width:0; }
+.monitor-grid > aside > div small { opacity:.65; }
