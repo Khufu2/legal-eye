@@ -47,8 +47,6 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
         allowed_host = urlparse(str(source.get("base_url") or "")).hostname or ""
         if not canonical_url or not allowed_host:
             raise PipelineError("source_object_unavailable", "Official UK source URL is unavailable", True)
-
-        # Correction slips and other PDF attachments are legitimate source objects, but not CLML.
         if urlparse(canonical_url).path.lower().endswith(".pdf"):
             with tempfile.TemporaryDirectory(prefix="legal-eye-uk-pdf-") as directory:
                 target = Path(directory) / "official.pdf"
@@ -58,8 +56,6 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
                 canonical["source"]["resolved_url"] = resolved_url
                 artifact_bytes = json.dumps(canonical, separators=(",", ":"), default=str).encode("utf-8")
                 return persist_public(api, job, document, source_object, canonical, artifact_bytes, source_hash, scan)
-
-        # legislation.gov.uk exposes every piece of legislation as Akoma Ntoso by appending /data.akn.
         base = canonical_url.rstrip("/")
         candidates = [f"{base}/data.akn", f"{base}/data.xml"]
         last_error: PipelineError | None = None
@@ -87,8 +83,6 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
         raise PipelineError("eurlex_identifier_missing", "EUR-Lex job lacks a CELLAR work URI", False)
     if work_uri.startswith("http://"):
         work_uri = "https://" + work_uri.removeprefix("http://")
-    # CELLAR's dissemination API supports content negotiation on the Work URI. This avoids
-    # guessing a CELEX identifier from cdm:work_id_document, which is not the CELEX key.
     raw, content_type, resolved_url = fetch_official_structured(
         work_uri,
         {"publications.europa.eu", "op.europa.eu"},
@@ -113,3 +107,4 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
 s=s[:start]+new+s[end:]
 p.write_text(s)
 print('structured source fetch v2 applied')
+# trigger
