@@ -1,0 +1,26 @@
+name: Apply Legal Eye Final Controls
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/legal-eye-final-controls.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Replace remaining fake controls
+        run: python scripts/patch_final_controls.py
+      - name: Commit live controls
+        run: |
+          git config user.name "legal-eye-automation"
+          git config user.email "actions@users.noreply.github.com"
+          rm .github/workflows/legal-eye-final-controls.yml scripts/patch_final_controls.py
+          git add app/page.tsx app/refinement.css .github/workflows/legal-eye-final-controls.yml scripts/patch_final_controls.py
+          git commit -m "Replace remaining fake live controls"
+          git push origin main
