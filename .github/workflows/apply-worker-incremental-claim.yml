@@ -1,0 +1,28 @@
+name: Apply incremental worker claim fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/patch_worker_incremental_claim.py
+      - .github/workflows/apply-worker-incremental-claim.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python scripts/patch_worker_incremental_claim.py
+      - run: python -m py_compile services/docling/worker.py
+      - run: |
+          rm -f scripts/patch_worker_incremental_claim.py .github/workflows/apply-worker-incremental-claim.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Claim ingestion jobs incrementally"
+          git push
