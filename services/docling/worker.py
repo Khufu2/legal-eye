@@ -405,7 +405,7 @@ def persist_private(
     metadata = dict(document.get("metadata") or {})
     metadata.update({"parser": "docling", "parser_state": "indexed", "canonical_artifact_hash": artifact_hash})
     api.patch("documents", f"id=eq.{encoded(document['id'])}", {
-        "status": "indexed",
+        "status": "ready",
         "content_hash": source_hash,
         "metadata": metadata,
     })
