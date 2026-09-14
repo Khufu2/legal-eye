@@ -23,12 +23,26 @@ jobs:
       - name: Apply official-source fallback
         run: python scripts/apply_public_source_fallback.py
       - name: Typecheck fallback
-        run: npm run typecheck
+        id: typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck-output.txt
+      - name: Upload typecheck diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-source-typecheck
+          path: typecheck-output.txt
+          retention-days: 1
       - name: Test application
+        if: success()
         run: npm test
       - name: Validate diff
+        if: success()
         run: git diff --check
       - name: Commit changes
+        if: success()
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name legal-eye-automation
