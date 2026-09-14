@@ -1,0 +1,26 @@
+name: Apply Legal Eye Persisted Actions
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/legal-eye-actions-fix.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Apply persisted action cleanup
+        run: python scripts/patch_persisted_actions.py
+      - name: Commit app changes
+        run: |
+          git config user.name "legal-eye-automation"
+          git config user.email "actions@users.noreply.github.com"
+          rm .github/workflows/legal-eye-actions-fix.yml scripts/patch_persisted_actions.py
+          git add app/page.tsx .github/workflows/legal-eye-actions-fix.yml scripts/patch_persisted_actions.py
+          git commit -m "Persist drafts and remove fake actions"
+          git push origin main
