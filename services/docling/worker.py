@@ -525,8 +525,14 @@ def run(limit: int, job_types: list[str]) -> int:
     worker_id = os.environ.get("DOCLING_WORKER_ID") or f"{socket.gethostname()}:{os.getpid()}"
     api = SupabaseApi(base_url, secret_key)
     processed = 0
+    handled = 0
     try:
-        for job in api.claim(worker_id, job_types, limit):
+        while handled < limit:
+            claimed = api.claim(worker_id, job_types, 1)
+            if not claimed:
+                break
+            job = claimed[0]
+            handled += 1
             job_id = str(job["id"])
             lease_token = str(job["lease_token"])
             try:
@@ -563,7 +569,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
-    count = run(max(1, min(args.limit, 10)), [value.strip() for value in args.job_types.split(",") if value.strip()])
+    count = run(max(1, min(args.limit, 25)), [value.strip() for value in args.job_types.split(",") if value.strip()])
     LOGGER.info("batch complete", extra={"processed": count})
 
 
