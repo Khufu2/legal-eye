@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - scripts/patch_structured_corpus_worker.py
+      - .github/workflows/apply-structured-corpus-worker.yml
 permissions:
   contents: write
 jobs:
