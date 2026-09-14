@@ -1,4 +1,4 @@
-"""Small authenticated ClamAV gateway for Legal Eye ingestion workers."""
+"""Authenticated ClamAV daemon gateway for Legal Eye ingestion workers."""
 
 from __future__ import annotations
 
