@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# one-shot trigger
 page=Path('app/page.tsx')
 text=page.read_text()
 anchor='import { EditorLive } from "@/components/legal-eye-editor";\n'
