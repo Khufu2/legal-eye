@@ -27,13 +27,13 @@ import { toast } from "sonner";
 
 type View = "ask"|"research"|"draft"|"review"|"tables"|"lists"|"matters"|"vault"|"agent"|"skills"|"workflows"|"monitor"|"trust";
 type Tone = "neutral"|"green"|"blue"|"amber"|"red";
-type Source = { id:string; title:string; citation:string; court:string; date:string; treatment:string; tone:Tone; excerpt:string; note:string; url?:string };
+type Source = { id:string; title:string; citation:string; court:string; date:string; treatment:string; tone:Tone; excerpt:string; note:string; url?:string; page?:number; paragraph?:string; sourceKind?:"public"|"private"; legalDocumentId?:string; privateDocumentId?:string; chunkId?:number; rank?:number };
 type CorpusDocument = { title:string; citation:string|null; published_at:string|null; canonical_url:string|null; jurisdiction_code:string; document_type:string };
 type CorpusPolicy = { name:string; jurisdiction_code:string|null; policy_state:string; sync_enabled:boolean; last_synced_at:string|null; license_name:string|null };
 type VaultDocument = { id:string; title:string; file_name:string|null; status:string; created_at:string; size_bytes:number|null };
 type DemoIdentity = { access_token:string; user:{ id:string; email?:string }; role:string; organization_id:string };
 type CorpusStats = { TZ:number; UK:number; EU:number; searchable:number|null };
-type Evidence = { id?:string; title?:string; citation?:string; content?:string; jurisdiction_code?:string; document_type?:string; canonical_url?:string; page_number?:number; source_node_ref?:string };
+type Evidence = { id?:string; chunk_id?:number; legal_document_id?:string; document_id?:string; title?:string; citation?:string; court?:string; content?:string; jurisdiction_code?:string; document_type?:string; canonical_url?:string; page_number?:number; paragraph_number?:string; source_node_ref?:string; rank?:number };
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
@@ -87,28 +87,40 @@ function SourceViewer({source,onClose}:{source:Source;onClose?:()=>void}) {
     <div className="source-body">
       <span className="eyebrow">{source.court}</span><h2>{source.title}</h2><p className="serif muted">{source.citation}</p>
       <div className="row spread source-meta"><ToneBadge tone={source.tone}>{source.treatment}</ToneBadge><span>{source.date}</span></div>
-      <hr/><span className="eyebrow">Relevant passage</span><blockquote>{source.excerpt}</blockquote><small>Page 14 · paragraph 37</small>
+      <hr/><span className="eyebrow">Relevant passage</span><blockquote>{source.excerpt}</blockquote>{(source.page||source.paragraph)&&<small>{[source.page?`Page ${source.page}`:null,source.paragraph?`¶ ${source.paragraph}`:null].filter(Boolean).join(" · ")}</small>}
       <hr/><div className="source-note"><ShieldCheck/><span>{source.note}</span></div>
-      <div className="source-actions"><Button variant="outline" onClick={()=>toast.success("Source pinned to matter")}>Pin to matter</Button><Button variant="outline" onClick={()=>toast.success("Citation copied")}>Copy citation</Button></div>
+      <div className="source-actions"><Button variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(source.citation);toast.success("Citation copied")}catch{toast.error("Could not copy citation")}}}>Copy citation</Button></div>
     </div>
   </aside>;
 }
 
-function Research({source,setSource,identity,connect,query,setQuery}:{source:Source;setSource:(s:Source)=>void;identity:DemoIdentity|null;connect:()=>void;query:string;setQuery:(value:string)=>void}) {
-  const [running,setRunning]=useState(false),[liveAnswer,setLiveAnswer]=useState<string|null>(null),[provider,setProvider]=useState<string|null>(null),[authorities,setAuthorities]=useState<Source[]>([]);
+function Research({source,setSource,identity,connect,query,setQuery,autoRun}:{source:Source;setSource:(s:Source)=>void;identity:DemoIdentity|null;connect:()=>void;query:string;setQuery:(value:string)=>void;autoRun:number}) {
+  const [running,setRunning]=useState(false),[liveAnswer,setLiveAnswer]=useState<string|null>(null),[provider,setProvider]=useState<string|null>(null),[authorities,setAuthorities]=useState<Source[]>([]),[savedId,setSavedId]=useState<string|null>(null);
+  const autoRunSeen=useRef(0);
+  const saveResearch=async()=>{
+    if(!identity||!liveAnswer||savedId)return;
+    try{
+      const response=await fetch(SUPABASE_URL+"/rest/v1/research_sessions",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({organization_id:identity.organization_id,created_by:identity.user.id,title:query.slice(0,160),jurisdiction_codes:["TZ","UK","EU"],mode:"deep",use_firm_knowledge:true,query,status:"complete",answer_markdown:liveAnswer,metadata:{provider,evidence:authorities.map(s=>({title:s.title,citation:s.citation,court:s.court,url:s.url,page:s.page,paragraph:s.paragraph,source_kind:s.sourceKind,legal_document_id:s.legalDocumentId,private_document_id:s.privateDocumentId,chunk_id:s.chunkId,rank:s.rank,excerpt:s.excerpt}))},completed_at:new Date().toISOString()})});
+      const rows=await response.json();
+      if(!response.ok||!rows?.[0]?.id)throw new Error(rows?.message||"Research could not be saved");
+      setSavedId(rows[0].id);toast.success("Research saved",{description:"The answer and exact evidence snapshot are persisted to your workspace."});
+    }catch(error){toast.error(error instanceof Error?error.message:"Research could not be saved")}
+  };
   const run=async()=>{
     if(!identity){connect();toast("Sign in to your organization to run live research.");return;}
-    setRunning(true);setLiveAnswer(null);
+    setRunning(true);setLiveAnswer(null);setSavedId(null);
     try{
       const response=await fetch("/api/legal-ai",{method:"POST",headers:{Authorization:"Bearer "+identity.access_token,"content-type":"application/json"},body:JSON.stringify({action:"research",query,jurisdictions:["TZ","UK","EU"],organization_id:identity.organization_id,use_firm_knowledge:true})});
       const data=await response.json();
       if(!response.ok) throw new Error(data?.error||"Research request failed");
-      const evidence:Evidence[]=[...(data.publicEvidence||[]),...(data.privateEvidence||[])];
-      const nextSources=evidence.map((item,index)=>({id:item.id||item.source_node_ref||String(index),title:item.title||"Untitled authority",citation:item.citation||item.source_node_ref||"Citation unavailable",court:item.jurisdiction_code||"Firm knowledge",date:item.page_number?`Page ${item.page_number}`:"",treatment:item.document_type||"Evidence",tone:"blue" as Tone,excerpt:item.content||"Exact passage unavailable.",note:"Retrieved from the governed corpus.",url:item.canonical_url}));
+      const publicEvidence:Evidence[]=data.publicEvidence||[],privateEvidence:Evidence[]=data.privateEvidence||[];
+      const mapEvidence=(item:Evidence,index:number,kind:"public"|"private"):Source=>({id:item.id||item.source_node_ref||`${kind}-${item.chunk_id||index}`,title:item.title||"Untitled authority",citation:item.citation||item.source_node_ref||(kind==="private"?"Private firm document":"Citation unavailable"),court:item.court||item.jurisdiction_code||(kind==="private"?"Firm knowledge":"Governed corpus"),date:item.page_number?`Page ${item.page_number}`:"",treatment:item.document_type||(kind==="private"?"Private evidence":"Evidence"),tone:"blue",excerpt:item.content||"Exact passage unavailable.",note:kind==="private"?"Exact passage retrieved from permission-filtered firm knowledge.":"Exact passage retrieved from the governed public corpus.",url:item.canonical_url,page:item.page_number,paragraph:item.paragraph_number,sourceKind:kind,legalDocumentId:item.legal_document_id,privateDocumentId:item.document_id,chunkId:item.chunk_id,rank:item.rank});
+      const nextSources=[...publicEvidence.map((item,index)=>mapEvidence(item,index,"public")),...privateEvidence.map((item,index)=>mapEvidence(item,index,"private"))];
       setAuthorities(nextSources);if(nextSources[0])setSource(nextSources[0]);
-      setLiveAnswer(data.answer);setProvider(data.provider);toast.success("Live research completed",{description:`${data.evidenceCount||0} verified passages retrieved.`});
+      setLiveAnswer(data.answer);setProvider(data.provider);toast.success("Live research completed",{description:`${data.evidenceCount||0} exact passages retrieved.`});
     }catch(error){toast.error(error instanceof Error?error.message:"Research failed")}finally{setRunning(false)}
   };
+  useEffect(()=>{if(autoRun>autoRunSeen.current&&query.trim()){autoRunSeen.current=autoRun;void run()}},[autoRun]);
   return <div className="research-page">
     <div className="research-bar"><Search/><Input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&run()}/><ToneBadge tone="blue">TZ</ToneBadge><Button size="sm" onClick={run}>{running?"Checking…":"Research"}</Button></div>
     <div className="research-grid">
@@ -117,7 +129,7 @@ function Research({source,setSource,identity,connect,query,setQuery}:{source:Sou
         <div className="plan-block"><span className="eyebrow">Searches</span>{["statutory test for unfair termination","procedural fairness labour revision","burden of proof employer","prejudice exception dismissal"].map((x,i)=><div className="plan-step" key={x}><i>{i+1}</i><span>{x}</span><Check/></div>)}</div>
         <div className="plan-block"><div className="row spread"><span className="eyebrow">Authority set</span><small>{authorities.length}</small></div>{authorities.length?authorities.map(s=><button className={"authority-mini "+(source.id===s.id?"active":"")} key={s.id} onClick={()=>setSource(s)}><span>{s.title}</span><small>{s.citation}</small></button>):<p className="muted">No evidence retrieved yet.</p>}</div>
       </aside>
-      <article className="answer-pane"><div className="answer-head"><div><span className="eyebrow">{liveAnswer?"Live answer":"Sample answer"}</span><span className="verified"><ShieldCheck/> {liveAnswer?`${provider} · governed request`:"Demonstration record"}</span></div><Button variant="ghost" size="sm">Save</Button></div>
+      <article className="answer-pane"><div className="answer-head"><div><span className="eyebrow">{liveAnswer?"Live answer":"Research answer"}</span><span className="verified"><ShieldCheck/> {liveAnswer?`${provider} · governed request`:"Exact evidence required"}</span></div><Button variant="ghost" size="sm" onClick={()=>void saveResearch()} disabled={!liveAnswer||!!savedId}>{savedId?"Saved":"Save"}</Button></div>
         <div className="answer-content">
           {liveAnswer?<div className="live-answer"><span>Live research gateway</span><p>{liveAnswer}</p><div className="answer-metrics"><div><span>Evidence</span><b>{authorities.length} passages</b></div><div><span>Jurisdiction</span><b>Tanzania</b></div><div><span>Review</span><b>Lawyer required</b></div></div></div>:<div className="empty-live"><Search/><h2>Ask a question to begin</h2><p>Only live, source-grounded results will appear here.</p></div>}
           {false&&<>
@@ -140,7 +152,7 @@ function AskView({go}:{go:(question:string)=>void}) {
   const [q,setQ]=useState("");
   const cards=[["Research an issue","Build an authority-backed answer across cases, legislation and firm knowledge.",Search],["Review documents","Apply a playbook and open every finding beside the exact source.",ClipboardCheck],["Prepare a draft","Create a first draft grounded in approved templates and current law.",FilePenLine],["Run a workflow","Coordinate research, review and delivery with visible checkpoints.",Workflow]] as const;
   return <div className="view-pad ask-view"><Header title="Ask Legal Eye" meta="Research public law and permitted firm knowledge in one place."/>
-    <div className="composer"><Textarea value={q} onChange={e=>setQ(e.target.value)} placeholder="Ask a legal question, review a clause, or start a matter workflow…"/><div className="row spread"><div className="row options"><Button variant="outline" size="sm"><Globe2/> Tanzania <ChevronDown/></Button><Button variant="ghost" size="sm"><FolderLock/> Firm knowledge</Button><Button variant="ghost" size="sm"><Upload/> Documents</Button></div><Button onClick={()=>go(q)}>Ask <ArrowUpRight/></Button></div></div>
+    <div className="composer"><Textarea value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")go(q)}} placeholder="Ask a legal question, review a clause, or start a matter workflow…"/><div className="row spread"><div className="row options"><ToneBadge tone="blue">Tanzania</ToneBadge><ToneBadge>Firm knowledge when permitted</ToneBadge></div><Button onClick={()=>go(q)} disabled={!q.trim()}>Ask <ArrowUpRight/></Button></div></div>
     <div className="prompt-grid">{cards.map(([title,copy,Icon])=><button key={title} onClick={()=>go(title)}><Icon/><strong>{title}</strong><span>{copy}</span><ChevronRight/></button>)}</div>
     <div className="recent"><div className="row spread"><h2>Continue working</h2></div><div className="empty-live"><FileClock/><h2>No recent work</h2><p>Your authenticated research and matters will appear here.</p></div></div>
   </div>;
@@ -271,7 +283,7 @@ function ReviewView({show,identity,connect}:{show:()=>void;identity:DemoIdentity
 
 function LegalEye() {
   const [view,setView]=useState<View>("ask"), [source,setSource]=useState(emptySource), [sourceOpen,setSourceOpen]=useState(false), [command,setCommand]=useState(false), [count,setCount]=useState(0), [documentCount,setDocumentCount]=useState(0), [liveDocuments,setLiveDocuments]=useState<CorpusDocument[]>([]), [corpusPolicies,setCorpusPolicies]=useState<CorpusPolicy[]>([]),[corpusStats,setCorpusStats]=useState<CorpusStats>({TZ:0,UK:0,EU:0,searchable:null}),[vaultDocuments,setVaultDocuments]=useState<VaultDocument[]>([]);
-  const [researchQuery,setResearchQuery]=useState("");
+  const [researchQuery,setResearchQuery]=useState(""),[researchRun,setResearchRun]=useState(0);
   const [authOpen,setAuthOpen]=useState(false), [email,setEmail]=useState(""), [password,setPassword]=useState(""), [identity,setIdentity]=useState<DemoIdentity|null>(null), [signingIn,setSigningIn]=useState(false);
   const refreshVault=async(current=identity)=>{if(!current){setVaultDocuments([]);return;}const response=await fetch(SUPABASE_URL+"/rest/v1/documents?select=id,title,file_name,status,created_at,size_bytes&organization_id=eq."+current.organization_id+"&order=created_at.desc&limit=12",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+current.access_token}});if(response.ok)setVaultDocuments(await response.json())};
   const signIn=async()=>{
@@ -284,7 +296,7 @@ function LegalEye() {
       const memberships=membership.ok?await membership.json():[];
       if(!memberships[0]?.organization_id)throw new Error("No active organization membership was found");
       const next={access_token:data.access_token,user:data.user,role:memberships[0].role||"member",organization_id:memberships[0].organization_id};
-      sessionStorage.setItem("legal-eye-session",JSON.stringify(next));setIdentity(next);setPassword("");setAuthOpen(false);await refreshVault(next);toast.success("Organization connected");
+      sessionStorage.setItem("legal-eye-session",JSON.stringify(next));setIdentity(next);setPassword("");setAuthOpen(false);await refreshVault(next);if(researchQuery.trim()){setResearchRun(x=>x+1);setView("research")}toast.success("Organization connected");
     }catch(error){toast.error(error instanceof Error?error.message:"Sign in failed")}finally{setSigningIn(false)}
   };
   const signOut=()=>{sessionStorage.removeItem("legal-eye-session");setIdentity(null);setVaultDocuments([]);setAuthOpen(false);toast("Signed out")};
@@ -293,7 +305,7 @@ function LegalEye() {
   useEffect(()=>{if(!identity)return;const current=identity;fetch(SUPABASE_URL+"/rest/v1/documents?select=id,title,file_name,status,created_at,size_bytes&organization_id=eq."+current.organization_id+"&order=created_at.desc&limit=12",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+current.access_token}}).then(async response=>{if(response.ok)setVaultDocuments(await response.json())}).catch(()=>null)},[identity]);
   const title=useMemo(()=>allNav.find(x=>x[0]===view)?.[1]||"Research",[view]), go=(v:View)=>{setView(v);setCommand(false)}, show=()=>setSourceOpen(true);
   const connect=()=>setAuthOpen(true);
-  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={connect} query={researchQuery} setQuery={setResearchQuery}/>:view==="ask"?<AskView go={question=>{if(question.trim())setResearchQuery(question);go("research")}}/>:view==="draft"?<Draft show={show} identity={identity} connect={connect}/>:view==="tables"?<EmptyFeature title="Tables" meta="Extract clauses and facts from your real matter documents." icon={Table2} identity={identity} connect={connect}/>:view==="agent"?<EmptyFeature title="Agent" meta="Run governed multi-step legal work with lawyer checkpoints." icon={Bot} identity={identity} connect={connect}/>:view==="skills"?<EmptyFeature title="Skills" meta="Version and approve your firm's reusable legal expertise." icon={Sparkles} identity={identity} connect={connect}/>:view==="lists"?<EmptyFeature title="Lists" meta="Build source-linked closing and compliance checklists." icon={ListChecks} identity={identity} connect={connect}/>:view==="monitor"?<MonitorView documents={liveDocuments} policies={corpusPolicies} total={documentCount} stats={corpusStats}/>:view==="workflows"?<EmptyFeature title="Workflows" meta="Build repeatable legal processes from real firm work." icon={Workflow} identity={identity} connect={connect}/>:view==="matters"?<EmptyFeature title="Matters" meta="Organize people, documents, research and approvals." icon={BriefcaseBusiness} identity={identity} connect={connect}/>:view==="vault"?<VaultView identity={identity} documents={vaultDocuments} connect={connect} refresh={()=>void refreshVault()}/>:view==="trust"?<TrustView/>:<ReviewView show={show} identity={identity} connect={connect}/>;
+  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={connect} query={researchQuery} setQuery={setResearchQuery} autoRun={researchRun}/>:view==="ask"?<AskView go={question=>{if(!question.trim())return;setResearchQuery(question);if(!identity){connect();toast("Sign in to ask Legal Eye.");return;}setResearchRun(x=>x+1);go("research")}}/>:view==="draft"?<Draft show={show} identity={identity} connect={connect}/>:view==="tables"?<EmptyFeature title="Tables" meta="Extract clauses and facts from your real matter documents." icon={Table2} identity={identity} connect={connect}/>:view==="agent"?<EmptyFeature title="Agent" meta="Run governed multi-step legal work with lawyer checkpoints." icon={Bot} identity={identity} connect={connect}/>:view==="skills"?<EmptyFeature title="Skills" meta="Version and approve your firm's reusable legal expertise." icon={Sparkles} identity={identity} connect={connect}/>:view==="lists"?<EmptyFeature title="Lists" meta="Build source-linked closing and compliance checklists." icon={ListChecks} identity={identity} connect={connect}/>:view==="monitor"?<MonitorView documents={liveDocuments} policies={corpusPolicies} total={documentCount} stats={corpusStats}/>:view==="workflows"?<EmptyFeature title="Workflows" meta="Build repeatable legal processes from real firm work." icon={Workflow} identity={identity} connect={connect}/>:view==="matters"?<EmptyFeature title="Matters" meta="Organize people, documents, research and approvals." icon={BriefcaseBusiness} identity={identity} connect={connect}/>:view==="vault"?<VaultView identity={identity} documents={vaultDocuments} connect={connect} refresh={()=>void refreshVault()}/>:view==="trust"?<TrustView/>:<ReviewView show={show} identity={identity} connect={connect}/>;
   return <SidebarProvider defaultOpen style={{"--sidebar-width":"11.75rem","--sidebar-width-icon":"3.35rem"} as React.CSSProperties}>
     <Sidebar collapsible="icon" className="legal-sidebar"><SidebarHeader className="brand-head"><span className="brand-mark">LE</span><span><b>Legal Eye</b><small>Global intelligence</small></span></SidebarHeader><SidebarContent>
       <Nav group={primary} view={view} go={go}/><Nav label="Context" group={context} view={view} go={go}/><Nav label="Intelligence" group={intelligence} view={view} go={go}/>
