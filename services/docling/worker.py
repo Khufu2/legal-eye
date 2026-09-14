@@ -270,48 +270,56 @@ def malware_scan(path: Path, content_type: str) -> dict[str, Any]:
                 )
             if response.status_code < 500 and response.status_code != 429:
                 if response.status_code >= 400:
-                    raise PipelineError("scanner_rejected", "Malware scanner rejected the source", False)
+                    raise PipelineError("scanner_rejected", "Content-safety scanner rejected the source", False)
                 result = response.json()
                 if result.get("clean") is not True:
-                    raise PipelineError("malware_detected", "Source failed malware validation", False)
-                return {"scanner": result.get("scanner", "configured-service"), "signature": result.get("signature"), "fallback": False}
-            LOGGER.warning("remote malware scanner unavailable; falling back locally", extra={"status": response.status_code})
+                    signature = str(result.get("signature") or "policy_rejected")
+                    raise PipelineError("content_safety_rejected", f"Source failed content-safety validation ({signature})", False)
+                return {
+                    "scanner": result.get("scanner", "configured-service"),
+                    "signature": result.get("signature"),
+                    "fallback": False,
+                    "signature_antivirus": result.get("scanner") in {"clamav", "clamd"},
+                }
+            LOGGER.warning("remote content-safety scanner unavailable; falling back locally", extra={"status": response.status_code})
         except PipelineError:
             raise
         except (httpx.HTTPError, ValueError) as error:
-            LOGGER.warning("remote malware scanner request failed; falling back locally", extra={"error": type(error).__name__})
+            LOGGER.warning("remote content-safety scanner request failed; falling back locally", extra={"error": type(error).__name__})
     else:
-        LOGGER.warning("remote malware scanner is not configured; falling back locally")
+        LOGGER.warning("remote content-safety scanner is not configured; falling back locally")
     return local_malware_scan(path)
 
 
 def convert(path: Path, file_name: str, content_type: str, source_hash: str) -> tuple[dict[str, Any], bytes]:
-    try:
-        from docling.document_converter import DocumentConverter
+    full_docling = os.environ.get("DOCLING_FULL_PARSE", "").strip().lower() in {"1", "true", "yes"}
+    if full_docling:
+        try:
+            from docling.document_converter import DocumentConverter
 
-        result = DocumentConverter().convert(path)
-        document = result.document.export_to_dict()
-        payload = {
-            "schema": "legal-eye.docling-conversion.v1",
-            "engine": {"name": "docling", "version": "2.124.0"},
-            "source": {"file_name": file_name, "content_type": content_type, "sha256": source_hash},
-            "status": str(result.status),
-            "document": document,
-            "provenance": {
-                "confidence": getattr(result, "confidence", {}),
-                "timings": getattr(result, "timings", {}),
-                "canonical_format": "docling-json",
-                "fallback": False,
-            },
-        }
-        encoded_payload = json.dumps(payload, separators=(",", ":"), default=str).encode("utf-8")
-        return payload, encoded_payload
-    except Exception as error:
-        LOGGER.warning(
-            "Docling conversion failed; using lightweight extractor",
-            extra={"file_name": file_name, "error": type(error).__name__},
-        )
-        return lightweight_convert(path, file_name, content_type, source_hash)
+            result = DocumentConverter().convert(path)
+            document = result.document.export_to_dict()
+            payload = {
+                "schema": "legal-eye.docling-conversion.v1",
+                "engine": {"name": "docling", "version": "2.124.0"},
+                "source": {"file_name": file_name, "content_type": content_type, "sha256": source_hash},
+                "status": str(result.status),
+                "document": document,
+                "provenance": {
+                    "confidence": getattr(result, "confidence", {}),
+                    "timings": getattr(result, "timings", {}),
+                    "canonical_format": "docling-json",
+                    "fallback": False,
+                },
+            }
+            encoded_payload = json.dumps(payload, separators=(",", ":"), default=str).encode("utf-8")
+            return payload, encoded_payload
+        except Exception as error:
+            LOGGER.warning(
+                "Full Docling conversion failed; using lightweight extractor",
+                extra={"file_name": file_name, "error": type(error).__name__},
+            )
+    return lightweight_convert(path, file_name, content_type, source_hash)
 
 
 def persist_public(

@@ -1,4 +1,4 @@
-"""Private, structure-preserving document conversion for Legal Eye."""
+"""Low-memory structure-preserving document conversion for Legal Eye."""
 
 from __future__ import annotations
 
@@ -10,14 +10,15 @@ from pathlib import Path
 from time import perf_counter
 from typing import Annotated
 
-from docling.document_converter import DocumentConverter
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-app = FastAPI(title="Legal Eye document parser", version="0.1.0", docs_url=None, redoc_url=None)
-converter = DocumentConverter()
+from fallback import lightweight_convert, local_malware_scan
+from pipeline import PipelineError
+
+app = FastAPI(title="Legal Eye document parser", version="0.2.0", docs_url=None, redoc_url=None)
 MAX_UPLOAD_BYTES = int(os.environ.get("DOCLING_MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))
-ALLOWED_SUFFIXES = {".pdf", ".docx", ".xlsx", ".pptx", ".html", ".htm", ".txt", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+ALLOWED_SUFFIXES = {".pdf", ".docx", ".xlsx", ".html", ".htm", ".txt"}
 
 
 def authorize(value: str | None) -> None:
@@ -28,7 +29,7 @@ def authorize(value: str | None) -> None:
 
 @app.get("/healthz")
 def health() -> dict[str, str]:
-    return {"status": "ok", "engine": "docling", "engine_version": "2.124.0"}
+    return {"status": "ok", "engine": "legal-eye-lightweight", "engine_version": "1.0.0"}
 
 
 @app.post("/v1/convert")
@@ -38,8 +39,8 @@ async def convert(
     include_markdown: Annotated[bool, Query()] = False,
 ) -> dict:
     authorize(parser_key)
-    suffix = Path(file.filename or "document.bin").suffix[:16]
-    if suffix.lower() not in ALLOWED_SUFFIXES:
+    suffix = Path(file.filename or "document.bin").suffix[:16].lower()
+    if suffix not in ALLOWED_SUFFIXES:
         raise HTTPException(status_code=415, detail="Unsupported document format")
     started = perf_counter()
     sha256 = hashlib.sha256()
@@ -53,28 +54,22 @@ async def convert(
             sha256.update(block)
             source.write(block)
         source.flush()
+        source_path = Path(source.name)
+        try:
+            await run_in_threadpool(local_malware_scan, source_path)
+            payload, _ = await run_in_threadpool(
+                lightweight_convert,
+                source_path,
+                file.filename or source_path.name,
+                file.content_type or "application/octet-stream",
+                sha256.hexdigest(),
+            )
+        except PipelineError as error:
+            raise HTTPException(status_code=422, detail=error.message) from error
 
-        result = await run_in_threadpool(converter.convert, Path(source.name))
-        document = result.document
-        payload: dict = {
-            "schema": "legal-eye.docling-conversion.v1",
-            "engine": {"name": "docling", "version": "2.124.0"},
-            "source": {
-                "file_name": file.filename,
-                "content_type": file.content_type,
-                "sha256": sha256.hexdigest(),
-                "byte_size": byte_count,
-            },
-            "status": str(result.status),
-            "elapsed_ms": round((perf_counter() - started) * 1000),
-            "document": document.export_to_dict(),
-            "provenance": {
-                "timings": getattr(result, "timings", {}),
-                "confidence": getattr(result, "confidence", {}),
-                "canonical_format": "docling-json",
-                "temporary_source_destroyed_after_response": True,
-            },
-        }
+        payload["source"]["byte_size"] = byte_count
+        payload["elapsed_ms"] = round((perf_counter() - started) * 1000)
         if include_markdown:
-            payload["derived_markdown"] = document.export_to_markdown()
+            texts = payload.get("document", {}).get("texts", [])
+            payload["derived_markdown"] = "\n\n".join(str(item.get("text") or "") for item in texts if item.get("text"))
         return payload
