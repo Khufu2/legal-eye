@@ -1,0 +1,26 @@
+name: Apply structured source fetch v2
+on:
+  push:
+    paths:
+      - scripts/patch_structured_source_fetch_v2.py
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/patch_structured_source_fetch_v2.py
+      - run: python -m py_compile services/docling/worker.py
+      - run: |
+          rm scripts/patch_structured_source_fetch_v2.py .github/workflows/apply-structured-source-fetch-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/docling/worker.py scripts/patch_structured_source_fetch_v2.py .github/workflows/apply-structured-source-fetch-v2.yml
+          git commit -m "Repair UK and EU structured source retrieval"
+          git push
