@@ -259,6 +259,22 @@ function firstValue(item:any,keys:string[]){
   return null;
 }
 
+function oagDocumentUrl(item:any){
+  const entry=Object.entries(item||{}).find(([key,value])=>
+    typeof value==="string"&&value.trim()&&/(doc|file).*path|path.*(doc|file)/i.test(key)
+  );
+  if(!entry) return null;
+  const path=String(entry[1]).trim().replace(/^\/+/,"");
+  if(!/^[a-zA-Z0-9/_\-.% ]+$/.test(path)||path.includes("..")) return null;
+  return `https://oagmis.oag.go.tz/storage/${path.split("/").filter(Boolean).map(encodeURIComponent).join("/")}`;
+}
+
+function oagCanonicalUrl(item:any,fallback:string){
+  const markup=firstValue(item,["name_link","title_link","link"]);
+  const match=markup?.match(/href=["'](https:\/\/oagmis\.oag\.go\.tz\/[^"']+)["']/i);
+  return match?.[1]?.replaceAll("&amp;","&")||fallback;
+}
+
 function batches<T>(items:T[],size=100){
   const result:T[][]=[];
   for(let index=0;index<items.length;index+=size) result.push(items.slice(index,index+size));
@@ -298,8 +314,8 @@ async function ingestTanzaniaOag(source:any,runId:string){
     const chapter=firstValue(item,["chapterNumber"]);
     const number=firstValue(item,["enactmentNo","issuedNumber","billNumber","resolutionNumber"]);
     const citation=chapter?`Cap. ${chapter}${publicationDate?` R.E. ${publicationDate.slice(0,4)}`:""}`:number?`No. ${number}`:null;
-    const canonicalUrl=`${base}/${collection.detailPath}/${id}`;
-    const downloadUrl=`${base}/${collection.downloadPath}/${id}/download`;
+    const canonicalUrl=oagCanonicalUrl(item,`${base}/${collection.detailPath}/${id}`);
+    const downloadUrl=oagDocumentUrl(item);
     const raw=JSON.stringify(item);
     const contentHash=await hash(raw);
     const language=/^(sheria|kanuni|katiba)\b/i.test(title)?"sw":"en";
@@ -320,9 +336,9 @@ async function ingestTanzaniaOag(source:any,runId:string){
       provenance:{catalog_url:feedUrl,download_url:downloadUrl,retrieved_by:"legal-corpus-ingest",connector_version:"tz-oag@1"},
       processing_state:"stored"
     });
-    if(!existing.has(externalId)) jobs.push({
+    if(downloadUrl) jobs.push({
       source_id:source.id,job_type:"official_pdf_fetch_parse",status:"queued",
-      idempotency_key:`public-docling:${source.id}:${externalId}:${contentHash}`,
+      idempotency_key:`public-docling-v2:${source.id}:${externalId}:${contentHash}`,
       payload:{external_id:externalId,download_url:downloadUrl,jurisdiction_code:"TZ",document_type:collection.documentType,
         file_name:`${collection.key}-${id}.pdf`,parser:"docling",preserve_pages:true,preserve_coordinates:true}
     });

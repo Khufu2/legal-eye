@@ -29,6 +29,28 @@ def encoded(value: Any) -> str:
     return quote(str(value), safe="")
 
 
+def oag_document_url(raw_content: Any) -> str | None:
+    """Resolve the official OAG storage URL from a catalog record."""
+    if isinstance(raw_content, str):
+        try:
+            raw_content = json.loads(raw_content)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(raw_content, dict):
+        return None
+    for key, value in raw_content.items():
+        normalized = str(key).lower()
+        if not isinstance(value, str) or not value.strip():
+            continue
+        if not (("doc" in normalized or "file" in normalized) and "path" in normalized):
+            continue
+        parts = [part for part in value.strip().lstrip("/").split("/") if part]
+        if not parts or any(part in {".", ".."} for part in parts):
+            return None
+        return "https://oagmis.oag.go.tz/storage/" + "/".join(quote(part, safe="-._~") for part in parts)
+    return None
+
+
 class SupabaseApi:
     def __init__(self, base_url: str, secret_key: str) -> None:
         self.base_url = base_url.rstrip("/")
@@ -416,7 +438,23 @@ def process_job(api: SupabaseApi, job: dict[str, Any]) -> int:
         if not required:
             raise PipelineError("source_policy_blocked", "Source policy does not permit this processing stage", False)
         allowed_host = urlparse(source["base_url"]).hostname or ""
-        source_hash, content_type, resolved_url = download_public_source(payload["download_url"], allowed_host, source_path)
+        download_url = str(payload["download_url"])
+        try:
+            source_hash, content_type, resolved_url = download_public_source(download_url, allowed_host, source_path)
+        except PipelineError as error:
+            if error.code != "upstream_fetch_failed" or allowed_host != "oagmis.oag.go.tz":
+                raise
+            catalog_rows = api.rows(
+                "source_ingest_objects",
+                f"source_id=eq.{encoded(source_id)}&external_id=eq.{encoded(external_id)}&select=raw_content&order=retrieved_at.desc&limit=1",
+            )
+            repaired_url = oag_document_url(catalog_rows[0].get("raw_content") if catalog_rows else None)
+            if not repaired_url or repaired_url == download_url:
+                raise
+            LOGGER.info("repaired stale OAG download URL", extra={"job_id": job.get("id"), "external_id": external_id})
+            updated_payload = {**payload, "download_url": repaired_url, "url_repaired_from_catalog": True}
+            api.patch("ingestion_jobs", f"id=eq.{encoded(job['id'])}", {"payload": updated_payload})
+            source_hash, content_type, resolved_url = download_public_source(repaired_url, allowed_host, source_path)
         scan = malware_scan(source_path, content_type)
         canonical, artifact_bytes = convert(source_path, file_name, content_type, source_hash)
         canonical["source"]["resolved_url"] = resolved_url

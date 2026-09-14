@@ -3,9 +3,19 @@ from __future__ import annotations
 import unittest
 
 from pipeline import PipelineError, extract_docling_chunks, validate_download, validate_source_url
+from worker import oag_document_url
 
 
 class SourceValidationTests(unittest.TestCase):
+    def test_resolves_oag_catalog_document_path(self) -> None:
+        self.assertEqual(
+            oag_document_url({"billDocPath": "bills/official document.pdf"}),
+            "https://oagmis.oag.go.tz/storage/bills/official%20document.pdf",
+        )
+
+    def test_rejects_oag_catalog_path_traversal(self) -> None:
+        self.assertIsNone(oag_document_url({"actDocPath": "../private/document.pdf"}))
+
     def test_accepts_approved_https_host(self) -> None:
         self.assertEqual(
             validate_source_url("https://oagmis.oag.go.tz/portal/acts/1/download", "oagmis.oag.go.tz"),
