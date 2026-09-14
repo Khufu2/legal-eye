@@ -404,7 +404,7 @@ def persist_private(
         raise PipelineError("artifact_persistence_failed", "Canonical artifact was not persisted")
     artifact_id = artifacts[0]["id"]
     chunks = extract_docling_chunks(canonical["document"])
-    api.delete("document_chunks", f"source_artifact_id=eq.{encoded(artifact_id)}")
+    api.delete("document_chunks", f"document_id=eq.{encoded(document["id"])}")
     for group in batches(chunks):
         rows = [{
             "document_id": document["id"],
