@@ -517,6 +517,28 @@ def enforce_public_source_policy(api: SupabaseApi, source_id: str) -> dict[str, 
     return source
 
 
+def fetch_official_structured(url: str, allowed_hosts: set[str], accept: str = "application/xml", language: str | None = None) -> tuple[str, str, str]:
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in allowed_hosts:
+        raise PipelineError("source_host_mismatch", "Structured source URL failed source policy", False)
+    headers = {"user-agent": "LegalEye/0.4 governed-corpus-worker", "accept": accept}
+    if language:
+        headers["accept-language"] = language
+    try:
+        response = httpx.get(url, timeout=httpx.Timeout(90, connect=10), follow_redirects=True, headers=headers)
+    except httpx.HTTPError as error:
+        raise PipelineError("upstream_fetch_failed", "Official structured fetch failed", True) from error
+    if response.status_code >= 400:
+        raise PipelineError("upstream_fetch_failed", f"Approved structured source returned {response.status_code}", response.status_code >= 500 or response.status_code == 429)
+    final = urlparse(str(response.url))
+    if final.scheme != "https" or final.hostname not in allowed_hosts:
+        raise PipelineError("source_host_mismatch", "Structured source redirected outside approved official hosts", False)
+    raw = response.text
+    if not raw.strip():
+        raise PipelineError("no_searchable_text", "Official structured source returned no text", False)
+    return raw, response.headers.get("content-type", accept), str(response.url)
+
+
 def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload: dict[str, Any]) -> int:
     job_type = str(job.get("job_type") or "")
     if job_type == "legal_xml_parse":
@@ -529,23 +551,39 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
             raise PipelineError("legal_document_missing", "Canonical legal document is unavailable", False)
         document = documents[0]
         source_id = str(document.get("source_id") or "")
-        enforce_public_source_policy(api, source_id)
+        source = enforce_public_source_policy(api, source_id)
         objects = api.rows(
             "source_ingest_objects",
             f"source_id=eq.{encoded(source_id)}&external_id=eq.{encoded(document['canonical_source_id'])}&select=id,content_sha256,raw_content,media_type,canonical_url&order=retrieved_at.desc&limit=1",
         )
-        if not objects or not objects[0].get("raw_content"):
-            raise PipelineError("source_object_unavailable", "Official structured source object is unavailable", True)
-        source_object = objects[0]
-        raw = str(source_object["raw_content"])
-        source_hash = str(source_object.get("content_sha256") or sha256_bytes(raw.encode("utf-8")))
-        canonical, artifact_bytes = structured_text_canonical(
-            raw,
-            f"{document['canonical_source_id']}.xml",
-            str(source_object.get("media_type") or "application/xml"),
-            source_hash,
-            str(source_object.get("canonical_url") or document.get("canonical_url") or ""),
-        )
+        source_object = objects[0] if objects else None
+        canonical_url = str(document.get("canonical_url") or (source_object or {}).get("canonical_url") or "")
+        allowed_host = urlparse(str(source.get("base_url") or "")).hostname or ""
+        if not canonical_url or not allowed_host:
+            raise PipelineError("source_object_unavailable", "Official UK source URL is unavailable", True)
+        if urlparse(canonical_url).path.lower().endswith(".pdf"):
+            with tempfile.TemporaryDirectory(prefix="legal-eye-uk-pdf-") as directory:
+                target = Path(directory) / "official.pdf"
+                source_hash, content_type, resolved_url = download_public_source(canonical_url, allowed_host, target)
+                scan = malware_scan(target, content_type)
+                canonical, artifact_bytes = convert(target, "official.pdf", content_type, source_hash)
+                canonical["source"]["resolved_url"] = resolved_url
+                artifact_bytes = json.dumps(canonical, separators=(",", ":"), default=str).encode("utf-8")
+                return persist_public(api, job, document, source_object, canonical, artifact_bytes, source_hash, scan)
+        base = canonical_url.rstrip("/")
+        candidates = [f"{base}/data.akn", f"{base}/data.xml"]
+        last_error: PipelineError | None = None
+        raw = content_type = resolved_url = ""
+        for candidate in candidates:
+            try:
+                raw, content_type, resolved_url = fetch_official_structured(candidate, {allowed_host}, "application/xml")
+                break
+            except PipelineError as error:
+                last_error = error
+        if not raw:
+            raise last_error or PipelineError("upstream_fetch_failed", "UK official structured source could not be fetched", True)
+        source_hash = sha256_bytes(raw.encode("utf-8"))
+        canonical, artifact_bytes = structured_text_canonical(raw, "official-legislation.akn", content_type, source_hash, resolved_url)
         scan = {"scanner": "official-structured-source", "signature": "xml-entity-policy-v1", "fallback": False, "signature_antivirus": False}
         return persist_public(api, job, document, source_object, canonical, artifact_bytes, source_hash, scan)
 
@@ -553,26 +591,20 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
     external_id = str(payload.get("external_id") or "")
     if not source_id or not external_id:
         raise PipelineError("invalid_public_job", "Structured public job lacks source identity", False)
-    source = enforce_public_source_policy(api, source_id)
-    celex = str(payload.get("celex") or "").strip()
-    if not celex:
-        raise PipelineError("eurlex_identifier_missing", "EUR-Lex job lacks a CELEX identifier", False)
-    xml_url = f"https://eur-lex.europa.eu/legal-content/EN/TXT/XML/?uri=CELEX:{quote(celex, safe='')}"
-    allowed_host = urlparse(source["base_url"]).hostname or ""
-    parsed_url = urlparse(xml_url)
-    if parsed_url.hostname != allowed_host or parsed_url.scheme != "https":
-        raise PipelineError("source_host_mismatch", "EUR-Lex structured URL failed source policy", False)
-    try:
-        response = httpx.get(xml_url, timeout=httpx.Timeout(90, connect=10), follow_redirects=True, headers={"user-agent": "LegalEye/0.3 governed-corpus-worker"})
-    except httpx.HTTPError as error:
-        raise PipelineError("upstream_fetch_failed", "EUR-Lex structured fetch failed", True) from error
-    if response.status_code >= 400:
-        raise PipelineError("upstream_fetch_failed", f"EUR-Lex returned {response.status_code}", response.status_code >= 500 or response.status_code == 429)
-    if urlparse(str(response.url)).hostname != allowed_host:
-        raise PipelineError("source_host_mismatch", "EUR-Lex redirected outside the approved source host", False)
-    raw = response.text
+    enforce_public_source_policy(api, source_id)
+    work_uri = str(payload.get("work_uri") or "").strip()
+    if not work_uri:
+        raise PipelineError("eurlex_identifier_missing", "EUR-Lex job lacks a CELLAR work URI", False)
+    if work_uri.startswith("http://"):
+        work_uri = "https://" + work_uri.removeprefix("http://")
+    raw, content_type, resolved_url = fetch_official_structured(
+        work_uri,
+        {"publications.europa.eu", "op.europa.eu"},
+        "application/xhtml+xml, application/xml;q=0.9, text/xml;q=0.8",
+        "eng",
+    )
     source_hash = sha256_bytes(raw.encode("utf-8"))
-    canonical, artifact_bytes = structured_text_canonical(raw, f"{celex}.xml", response.headers.get("content-type", "application/xml"), source_hash, str(response.url))
+    canonical, artifact_bytes = structured_text_canonical(raw, "eurlex-cellar.xml", content_type, source_hash, resolved_url)
     documents = api.rows(
         "legal_documents",
         f"source_id=eq.{encoded(source_id)}&canonical_source_id=eq.{encoded(external_id)}&select=id,jurisdiction_code,language,structured_content&limit=1",
@@ -585,7 +617,6 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
     )
     scan = {"scanner": "official-structured-source", "signature": "xml-entity-policy-v1", "fallback": False, "signature_antivirus": False}
     return persist_public(api, job, documents[0], objects[0] if objects else None, canonical, artifact_bytes, source_hash, scan)
-
 
 def process_job(api: SupabaseApi, job: dict[str, Any]) -> int:
     payload = job.get("payload") or {}
