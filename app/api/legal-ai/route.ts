@@ -95,9 +95,17 @@ export async function POST(request: Request) {
     });
     if (!userCheck.ok) return response({ error: "Invalid or expired session" }, 401);
     const user = await userCheck.json() as { id: string };
-    const gatewayOptions = { gateway: { user: user.id, tags: [`feature:${input.action}`, "product:legal-eye", "classification:confidential"] } };
 
+    const membershipCheck = await fetch(
+      `${supabaseUrl}/rest/v1/organization_members?select=organization_id&organization_id=eq.${encodeURIComponent(input.organization_id)}&user_id=eq.${encodeURIComponent(user.id)}&is_active=is.true&limit=1`,
+      { headers: { apikey: supabaseKey, authorization }, cache: "no-store" },
+    );
+    const memberships = membershipCheck.ok ? await membershipCheck.json().catch(() => []) : [];
+    if (!membershipCheck.ok || !memberships?.length) return response({ error: "Organization access denied" }, 403);
+
+    const gatewayOptions = { gateway: { user: user.id, tags: [`feature:${input.action}`, "product:legal-eye", "classification:confidential"] } };
     const started = Date.now();
+
     if (input.action === "research") {
       if (!input.query) return response({ error: "Research question required" }, 400);
       const evidence = await callLegalApi(token, {
