@@ -68,7 +68,7 @@ class SupabaseApi:
         self.client.close()
 
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
-        attempts = 3 if method.upper() in {"GET", "HEAD"} else 1
+        attempts = 3 if method.upper() in {"GET", "HEAD", "PATCH", "DELETE", "PUT"} else 1
         response: httpx.Response | None = None
         for attempt in range(attempts):
             try:
