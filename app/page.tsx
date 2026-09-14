@@ -34,6 +34,7 @@ type VaultDocument = { id:string; title:string; file_name:string|null; status:st
 type DemoIdentity = { access_token:string; user:{ id:string; email?:string }; role:string; organization_id:string };
 type CorpusStats = { TZ:number; UK:number; EU:number; searchable:number|null };
 type Evidence = { id?:string; chunk_id?:number; legal_document_id?:string; document_id?:string; title?:string; citation?:string; court?:string; content?:string; jurisdiction_code?:string; document_type?:string; canonical_url?:string; page_number?:number; paragraph_number?:string; source_node_ref?:string; rank?:number };
+type ReviewFinding = { title:string; clauseRef:string|null; risk:"high"|"medium"|"low"|"info"; whyItMatters:string; originalText?:string|null; suggestedText?:string|null };
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
@@ -266,19 +267,75 @@ function TrustView() {
   ] as const;
   return <div className="trust-view"><div className="trust-hero"><span className="eyebrow">Enterprise control plane</span><h1>Trust is part of the work product.</h1><p>Every source, model call, permission decision and human approval should be reviewable without asking Legal Eye to explain itself.</p><div><Button><ShieldCheck/> Export control report</Button><Button variant="outline">Open evidence register</Button></div></div><div className="trust-layout"><section><div className="trust-heading"><span>Controls</span><small>live implementation state</small></div>{controls.map(([title,status,copy,Icon,tone])=><article className="control-row" key={title}><i><Icon/></i><div><b>{title}</b><p>{copy}</p></div><ToneBadge tone={tone}>{status}</ToneBadge><ChevronRight/></article>)}</section><aside><span className="eyebrow">Procurement readiness</span><h2>Enterprise evidence room</h2><p>Architecture is implemented; independent operational proof is still required before bank-production acceptance.</p>{[["Identity & access","3 / 5"],["Data protection","4 / 7"],["Application security","5 / 8"],["AI governance","4 / 7"],["Resilience","1 / 5"]].map(([name,value],i)=><div className="readiness" key={name}><span>{name}<b>{value}</b></span><Progress value={[60,57,63,57,20][i]}/></div>)}<footer><CircleAlert/><span>Open gates: external penetration test, disaster-recovery exercise, GCP KMS, SAML conformance and completed legal evaluation sets.</span></footer></aside></div></div>;
 }
-function ReviewView({show,identity,connect}:{show:()=>void;identity:DemoIdentity|null;connect:()=>void}) {
-  const [contract,setContract]=useState(""),[rows,setRows]=useState<string[][]>([]),[reviewing,setReviewing]=useState(false);
+function ReviewView({identity,connect,documents,refresh}:{identity:DemoIdentity|null;connect:()=>void;documents:VaultDocument[];refresh:()=>void}) {
+  const [contract,setContract]=useState(""),[findings,setFindings]=useState<ReviewFinding[]>([]),[reviewing,setReviewing]=useState(false),[selectedDocument,setSelectedDocument]=useState(""),[reviewProjectId,setReviewProjectId]=useState<string|null>(null),[loadedTitle,setLoadedTitle]=useState("Pasted agreement text");
+  const authHeaders=identity?{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token}:null;
+  const resetResults=()=>{setFindings([]);setReviewProjectId(null)};
+  const loadDocument=async(id:string)=>{
+    setSelectedDocument(id);resetResults();
+    if(!id){setContract("");setLoadedTitle("Pasted agreement text");return;}
+    if(!identity){connect();return;}
+    const doc=documents.find(item=>item.id===id);setLoadedTitle(doc?.title||"Private document");
+    try{
+      const response=await fetch(SUPABASE_URL+`/rest/v1/document_chunks?select=clause_number,paragraph_number,page_number,content&document_id=eq.${encodeURIComponent(id)}&order=id.asc&limit=1000`,{headers:authHeaders!});
+      const chunks=await response.json();
+      if(!response.ok)throw new Error(chunks?.message||"Document text could not be loaded");
+      if(!chunks.length){setContract("");throw new Error(`Processing has not produced searchable text for ${doc?.title||"this document"} yet (${doc?.status||"unknown"}).`)}
+      setContract(chunks.map((chunk:{clause_number?:string;paragraph_number?:string;page_number?:number;content:string})=>{const ref=chunk.clause_number||chunk.paragraph_number||(chunk.page_number?`page ${chunk.page_number}`:null);return `${ref?`[${ref}] `:""}${chunk.content}`}).join("\n\n"));
+      toast.success("Processed document loaded",{description:`${chunks.length} exact source chunks are available for review.`});
+    }catch(error){toast.error(error instanceof Error?error.message:"Document text could not be loaded")}
+  };
+  const createPastedSource=async()=>{
+    if(!identity)throw new Error("Sign in required");
+    const blob=new Blob([contract],{type:"text/plain;charset=utf-8"});
+    const stamp=new Date().toISOString().replace(/[:.]/g,"-");
+    const fileName=`pasted-contract-${stamp}.txt`,storagePath=`${identity.organization_id}/${crypto.randomUUID()}/${fileName}`;
+    const stored=await fetch(`${SUPABASE_URL}/storage/v1/object/firm-vault/${storagePath.split("/").map(encodeURIComponent).join("/")}`,{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":"text/plain;charset=utf-8","x-upsert":"false"},body:blob});
+    if(!stored.ok)throw new Error((await stored.json().catch(()=>null))?.message||"Pasted source could not be secured");
+    const created=await fetch(SUPABASE_URL+"/rest/v1/documents",{method:"POST",headers:{...authHeaders!,"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({organization_id:identity.organization_id,title:`Pasted contract · ${new Date().toLocaleDateString()}`,file_name:fileName,mime_type:"text/plain",storage_path:storagePath,size_bytes:blob.size,status:"uploaded",jurisdiction_codes:["TZ"],uploaded_by:identity.user.id,metadata:{upload_channel:"review-paste",classification:"confidential"}})});
+    const rows=await created.json();
+    if(!created.ok||!rows?.[0]?.id)throw new Error(rows?.message||"Pasted source record could not be created");
+    refresh();
+    return rows[0].id as string;
+  };
+  const persistReview=async(documentId:string,data:{overallRisk?:string;summary?:string;provider?:string;findings?:ReviewFinding[]})=>{
+    if(!identity)throw new Error("Sign in required");
+    const allowed=new Set(["high","medium","low","info"]),risk=allowed.has(data.overallRisk||"")?data.overallRisk:"info";
+    const project=await fetch(SUPABASE_URL+"/rest/v1/review_projects",{method:"POST",headers:{...authHeaders!,"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({organization_id:identity.organization_id,document_id:documentId,created_by:identity.user.id,overall_risk:risk,status:"complete",summary:{finding_count:data.findings?.length||0,provider:data.provider||"unknown",summary:data.summary||null,source:"legal-eye-web"}})});
+    const projects=await project.json();
+    if(!project.ok||!projects?.[0]?.id)throw new Error(projects?.message||"Review project could not be saved");
+    const projectId=projects[0].id as string;
+    if(data.findings?.length){
+      const saved=await fetch(SUPABASE_URL+"/rest/v1/review_findings",{method:"POST",headers:{...authHeaders!,"content-type":"application/json",Prefer:"return=minimal"},body:JSON.stringify(data.findings.map(f=>({review_project_id:projectId,title:f.title||"Finding",risk:allowed.has(f.risk)?f.risk:"info",clause_ref:f.clauseRef||null,why_it_matters:f.whyItMatters||null,original_text:f.originalText||null,suggested_text:f.suggestedText||null,status:"open",metadata:{provider:data.provider||"unknown"}})))});
+      if(!saved.ok)throw new Error((await saved.json().catch(()=>null))?.message||"Review findings could not be saved");
+    }
+    return projectId;
+  };
   const runReview=async()=>{
     if(!identity){connect();return;}
-    setReviewing(true);
+    if(contract.trim().length<20){toast.error("Load a processed document or paste contract text first.");return;}
+    setReviewing(true);resetResults();
     try{
+      const documentId=selectedDocument||await createPastedSource();
       const response=await fetch("/api/legal-ai",{method:"POST",headers:{Authorization:"Bearer "+identity.access_token,"content-type":"application/json"},body:JSON.stringify({action:"review",organization_id:identity.organization_id,text:contract,playbook:["Require consent mechanics and identify closing risk.","Data protection indemnity must be proportionate and addressed against the negotiated liability cap.","Flag inconsistencies between governing law, dispute forum, and mandatory Tanzanian approvals."]})});
       const data=await response.json();if(!response.ok)throw new Error(data.error||"Review failed");
-      setRows((data.findings||[]).map((finding:{title:string;clauseRef:string|null;risk:string;whyItMatters:string})=>[finding.title,finding.clauseRef||"Text",finding.risk[0].toUpperCase()+finding.risk.slice(1),finding.whyItMatters]));
-      toast.success("Contract review completed",{description:`${data.findings?.length||0} text-supported findings require lawyer review.`});
+      const next=(data.findings||[]) as ReviewFinding[];setFindings(next);
+      const projectId=await persistReview(documentId,{...data,findings:next});setReviewProjectId(projectId);
+      toast.success("Contract review saved",{description:`${next.length} text-supported findings were persisted for lawyer review.`});
     }catch(error){toast.error(error instanceof Error?error.message:"Review failed")}finally{setReviewing(false)}
   };
-  return <div className="view-pad"><Header title="Review" meta="Playbook-backed findings, redlines and evidence in one workspace." action={<Button onClick={runReview} disabled={reviewing||contract.trim().length<20}><Sparkles/> {reviewing?"Reviewing…":"Run AI review"}</Button>}/><div className="review-summary">{[["Document",contract?"Pasted agreement text":"No document loaded"],["Playbook","Core legal review"],["Findings",String(rows.length)]].map(x=><div key={x[0]}><span>{x[0]}</span><b>{x[1]}</b></div>)}</div><Textarea value={contract} onChange={event=>setContract(event.target.value)} placeholder="Paste the agreement text to review..." aria-label="Contract text for review"/><div className="findings">{rows.length?rows.map(r=><button key={r[0]} onClick={show}><i className={r[2].toLowerCase()}/><span><ToneBadge tone={r[2]==="High"?"red":r[2]==="Low"?"green":"amber"}>{r[2]}</ToneBadge><h3>{r[0]}</h3><p>{r[3]}</p><small>{r[1]} · AI finding · lawyer verification required</small></span><ChevronRight/></button>):<div className="empty-live"><ClipboardCheck/><h2>No findings yet</h2><p>Paste a real agreement and run the review.</p></div>}</div></div>;
+  const exportReview=()=>{
+    if(!reviewProjectId)return;
+    const payload={review_project_id:reviewProjectId,document:selectedDocument||loadedTitle,exported_at:new Date().toISOString(),lawyer_verification_required:true,findings};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
+    const anchor=document.createElement("a");anchor.href=url;anchor.download=`legal-eye-review-${reviewProjectId}.json`;document.body.appendChild(anchor);anchor.click();anchor.remove();URL.revokeObjectURL(url);toast.success("Review exported");
+  };
+  return <div className="view-pad"><Header title="Review" meta="Playbook-backed findings, saved results and exact document text in one workspace." action={<div className="row"><Button variant="outline" onClick={exportReview} disabled={!reviewProjectId}>Export JSON</Button><Button onClick={runReview} disabled={reviewing||contract.trim().length<20}><Sparkles/> {reviewing?"Reviewing…":"Run AI review"}</Button></div>}/>
+    <div className="review-source-picker"><label><span>Source document</span><select value={selectedDocument} onChange={event=>void loadDocument(event.target.value)}><option value="">Paste contract text</option>{documents.map(doc=><option value={doc.id} key={doc.id}>{doc.title} · {doc.status}</option>)}</select></label>{selectedDocument?<ToneBadge tone={contract?"green":"amber"}>{contract?"Source loaded":"Processing required"}</ToneBadge>:<ToneBadge>Private pasted source</ToneBadge>}</div>
+    <div className="review-summary">{[["Document",loadedTitle],["Playbook","Core legal review"],["Findings",String(findings.length)],["Saved",reviewProjectId?"Yes":"Not yet"]].map(x=><div key={x[0]}><span>{x[0]}</span><b>{x[1]}</b></div>)}</div>
+    <Textarea value={contract} onChange={event=>{setContract(event.target.value);if(selectedDocument){setSelectedDocument("");setLoadedTitle("Pasted agreement text")}resetResults()}} placeholder="Paste the agreement text, or select a processed vault document above..." aria-label="Contract text for review"/>
+    <div className="findings">{findings.length?findings.map((finding,index)=><article key={`${finding.title}-${index}`}><i className={finding.risk}/><span><ToneBadge tone={finding.risk==="high"?"red":finding.risk==="low"?"green":finding.risk==="info"?"blue":"amber"}>{finding.risk[0].toUpperCase()+finding.risk.slice(1)}</ToneBadge><h3>{finding.title}</h3><p>{finding.whyItMatters}</p>{finding.originalText?<blockquote>{finding.originalText}</blockquote>:null}{finding.suggestedText?<div className="suggested-text"><small>Suggested lawyer-review wording</small><p>{finding.suggestedText}</p></div>:null}<small>{finding.clauseRef||"Contract text"} · AI finding · lawyer verification required</small></span></article>):<div className="empty-live"><ClipboardCheck/><h2>No findings yet</h2><p>Select a processed private document or paste agreement text, then run the review.</p></div>}</div>
+  </div>;
 }
 
 function LegalEye() {
@@ -305,7 +362,7 @@ function LegalEye() {
   useEffect(()=>{if(!identity)return;const current=identity;fetch(SUPABASE_URL+"/rest/v1/documents?select=id,title,file_name,status,created_at,size_bytes&organization_id=eq."+current.organization_id+"&order=created_at.desc&limit=12",{headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+current.access_token}}).then(async response=>{if(response.ok)setVaultDocuments(await response.json())}).catch(()=>null)},[identity]);
   const title=useMemo(()=>allNav.find(x=>x[0]===view)?.[1]||"Research",[view]), go=(v:View)=>{setView(v);setCommand(false)}, show=()=>setSourceOpen(true);
   const connect=()=>setAuthOpen(true);
-  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={connect} query={researchQuery} setQuery={setResearchQuery} autoRun={researchRun}/>:view==="ask"?<AskView go={question=>{if(!question.trim())return;setResearchQuery(question);if(!identity){connect();toast("Sign in to ask Legal Eye.");return;}setResearchRun(x=>x+1);go("research")}}/>:view==="draft"?<Draft show={show} identity={identity} connect={connect}/>:view==="tables"?<EmptyFeature title="Tables" meta="Extract clauses and facts from your real matter documents." icon={Table2} identity={identity} connect={connect}/>:view==="agent"?<EmptyFeature title="Agent" meta="Run governed multi-step legal work with lawyer checkpoints." icon={Bot} identity={identity} connect={connect}/>:view==="skills"?<EmptyFeature title="Skills" meta="Version and approve your firm's reusable legal expertise." icon={Sparkles} identity={identity} connect={connect}/>:view==="lists"?<EmptyFeature title="Lists" meta="Build source-linked closing and compliance checklists." icon={ListChecks} identity={identity} connect={connect}/>:view==="monitor"?<MonitorView documents={liveDocuments} policies={corpusPolicies} total={documentCount} stats={corpusStats}/>:view==="workflows"?<EmptyFeature title="Workflows" meta="Build repeatable legal processes from real firm work." icon={Workflow} identity={identity} connect={connect}/>:view==="matters"?<EmptyFeature title="Matters" meta="Organize people, documents, research and approvals." icon={BriefcaseBusiness} identity={identity} connect={connect}/>:view==="vault"?<VaultView identity={identity} documents={vaultDocuments} connect={connect} refresh={()=>void refreshVault()}/>:view==="trust"?<TrustView/>:<ReviewView show={show} identity={identity} connect={connect}/>;
+  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={connect} query={researchQuery} setQuery={setResearchQuery} autoRun={researchRun}/>:view==="ask"?<AskView go={question=>{if(!question.trim())return;setResearchQuery(question);if(!identity){connect();toast("Sign in to ask Legal Eye.");return;}setResearchRun(x=>x+1);go("research")}}/>:view==="draft"?<Draft show={show} identity={identity} connect={connect}/>:view==="tables"?<EmptyFeature title="Tables" meta="Extract clauses and facts from your real matter documents." icon={Table2} identity={identity} connect={connect}/>:view==="agent"?<EmptyFeature title="Agent" meta="Run governed multi-step legal work with lawyer checkpoints." icon={Bot} identity={identity} connect={connect}/>:view==="skills"?<EmptyFeature title="Skills" meta="Version and approve your firm's reusable legal expertise." icon={Sparkles} identity={identity} connect={connect}/>:view==="lists"?<EmptyFeature title="Lists" meta="Build source-linked closing and compliance checklists." icon={ListChecks} identity={identity} connect={connect}/>:view==="monitor"?<MonitorView documents={liveDocuments} policies={corpusPolicies} total={documentCount} stats={corpusStats}/>:view==="workflows"?<EmptyFeature title="Workflows" meta="Build repeatable legal processes from real firm work." icon={Workflow} identity={identity} connect={connect}/>:view==="matters"?<EmptyFeature title="Matters" meta="Organize people, documents, research and approvals." icon={BriefcaseBusiness} identity={identity} connect={connect}/>:view==="vault"?<VaultView identity={identity} documents={vaultDocuments} connect={connect} refresh={()=>void refreshVault()}/>:view==="trust"?<TrustView/>:<ReviewView identity={identity} connect={connect} documents={vaultDocuments} refresh={()=>void refreshVault()}/>;
   return <SidebarProvider defaultOpen style={{"--sidebar-width":"11.75rem","--sidebar-width-icon":"3.35rem"} as React.CSSProperties}>
     <Sidebar collapsible="icon" className="legal-sidebar"><SidebarHeader className="brand-head"><span className="brand-mark">LE</span><span><b>Legal Eye</b><small>Global intelligence</small></span></SidebarHeader><SidebarContent>
       <Nav group={primary} view={view} go={go}/><Nav label="Context" group={context} view={view} go={go}/><Nav label="Intelligence" group={intelligence} view={view} go={go}/>
