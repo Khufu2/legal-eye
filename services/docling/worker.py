@@ -10,6 +10,7 @@ import os
 import socket
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urljoin, urlparse
@@ -66,7 +67,22 @@ class SupabaseApi:
         self.client.close()
 
     def request(self, method: str, path: str, **kwargs: Any) -> Any:
-        response = self.client.request(method, f"{self.base_url}{path}", **kwargs)
+        attempts = 3 if method.upper() in {"GET", "HEAD"} else 1
+        response: httpx.Response | None = None
+        for attempt in range(attempts):
+            try:
+                response = self.client.request(method, f"{self.base_url}{path}", **kwargs)
+            except httpx.HTTPError:
+                if attempt + 1 >= attempts:
+                    raise PipelineError("supabase_transport_failed", "Supabase transport failed", True)
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            if response.status_code < 500 and response.status_code != 429:
+                break
+            if attempt + 1 < attempts:
+                time.sleep(0.5 * (attempt + 1))
+        if response is None:
+            raise PipelineError("supabase_transport_failed", "Supabase transport failed", True)
         if response.status_code >= 400:
             raise PipelineError(
                 "supabase_request_failed",
@@ -496,11 +512,17 @@ def run(limit: int, job_types: list[str]) -> int:
                     LOGGER.info("job completed", extra={"job_id": job_id, "chunks": chunk_count})
                     processed += 1
             except PipelineError as error:
-                state = api.fail(job_id, lease_token, error)
-                LOGGER.warning("job failed", extra={"job_id": job_id, "error_code": error.code, "state": state})
+                try:
+                    state = api.fail(job_id, lease_token, error)
+                    LOGGER.warning("job failed", extra={"job_id": job_id, "error_code": error.code, "state": state})
+                except PipelineError:
+                    LOGGER.exception("could not persist job failure; lease will expire", extra={"job_id": job_id})
             except Exception as error:
                 LOGGER.exception("unexpected job failure", extra={"job_id": job_id})
-                api.fail(job_id, lease_token, PipelineError("unexpected_worker_error", str(error)))
+                try:
+                    api.fail(job_id, lease_token, PipelineError("unexpected_worker_error", str(error)))
+                except PipelineError:
+                    LOGGER.exception("could not persist unexpected job failure; lease will expire", extra={"job_id": job_id})
     finally:
         api.close()
     return processed
