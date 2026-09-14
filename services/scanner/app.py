@@ -27,19 +27,33 @@ def authorize(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+def run_scan(path: Path, timeout: int = 180) -> subprocess.CompletedProcess[str]:
+    """Scan through the resident clamd process instead of loading signatures per request."""
+    return subprocess.run(
+        ["clamdscan", "--fdpass", "--no-summary", str(path)],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     try:
-        version = subprocess.run(
-            ["clamscan", "--version"],
+        result = subprocess.run(
+            ["clamdscan", "--version"],
             check=True,
             capture_output=True,
             text=True,
             timeout=10,
-        ).stdout.strip()
-    except (OSError, subprocess.SubprocessError) as error:
-        raise HTTPException(status_code=503, detail="ClamAV is unavailable") from error
-    return {"status": "ok", "scanner": version}
+        )
+        with tempfile.NamedTemporaryFile(prefix="legal-eye-health-") as target:
+            probe = run_scan(Path(target.name), timeout=20)
+        if probe.returncode != 0:
+            raise RuntimeError((probe.stdout or probe.stderr or "clamd probe failed").strip())
+    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
+        raise HTTPException(status_code=503, detail="ClamAV daemon is unavailable") from error
+    return {"status": "ok", "scanner": result.stdout.strip() or "clamd"}
 
 
 @app.post("/scan")
@@ -61,17 +75,12 @@ async def scan(
                 digest.update(block)
                 target.write(block)
 
-        result = subprocess.run(
-            ["clamscan", "--no-summary", "--infected", str(temporary_path)],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-        output = (result.stdout or result.stderr).strip()
+        result = run_scan(temporary_path)
+        output = (result.stdout or result.stderr or "").strip()
         if result.returncode == 0:
             return {
                 "clean": True,
-                "scanner": "clamav",
+                "scanner": "clamd",
                 "signature": None,
                 "sha256": digest.hexdigest(),
             }
@@ -79,15 +88,15 @@ async def scan(
             signature = output.rsplit(": ", 1)[-1].removesuffix(" FOUND") if output else "unknown"
             return {
                 "clean": False,
-                "scanner": "clamav",
+                "scanner": "clamd",
                 "signature": signature,
                 "sha256": digest.hexdigest(),
             }
-        LOGGER.error("ClamAV scan failed: exit=%s output=%s", result.returncode, output[:500])
-        raise HTTPException(status_code=503, detail="ClamAV scan failed")
+        LOGGER.error("ClamAV daemon scan failed: exit=%s output=%s", result.returncode, output[:500])
+        raise HTTPException(status_code=503, detail="ClamAV daemon scan failed")
     except subprocess.TimeoutExpired as error:
-        LOGGER.error("ClamAV scan timed out", extra={"timeout_seconds": 180})
-        raise HTTPException(status_code=503, detail="ClamAV scan timed out") from error
+        LOGGER.error("ClamAV daemon scan timed out", extra={"timeout_seconds": 180})
+        raise HTTPException(status_code=503, detail="ClamAV daemon scan timed out") from error
     finally:
         await file.close()
         if temporary_path is not None:
