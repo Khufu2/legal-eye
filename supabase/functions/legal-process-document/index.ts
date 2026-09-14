@@ -18,7 +18,7 @@ const A = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || bundledKey("SUPABASE_PUBLI
 const S = Deno.env.get("SUPABASE_SECRET_KEY") || bundledKey("SUPABASE_SECRET_KEYS") ||
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 if (!U || !A || !S) throw new Error("Supabase runtime configuration is incomplete");
-const DEFAULT_ORIGIN = "https://legal-eye.truckai-co.chatgpt.site";
+const DEFAULT_ORIGIN = "https://legal-eye-six.vercel.app";
 const ALLOWED_ORIGINS = new Set(
   (Deno.env.get("ALLOWED_WEB_ORIGINS") || DEFAULT_ORIGIN)
     .split(",")
