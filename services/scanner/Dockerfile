@@ -8,17 +8,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /service
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y clamav clamav-freshclam \
+    && apt-get install --no-install-recommends -y clamav clamav-daemon clamav-freshclam gosu \
     && freshclam \
+    && mkdir -p /run/clamav \
+    && chown -R clamav:clamav /run/clamav /var/lib/clamav \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
-COPY app.py ./
-
-RUN useradd --create-home --uid 10001 scanner && chown -R scanner:scanner /service
-USER scanner
+COPY app.py entrypoint.sh ./
+RUN chmod 0755 /service/entrypoint.sh \
+    && useradd --create-home --uid 10001 scanner \
+    && chown -R scanner:scanner /service
 
 EXPOSE 8080
-CMD ["sh", "-c", "exec uvicorn app:app --host 0.0.0.0 --port ${PORT} --workers 1 --proxy-headers --no-server-header"]
-
+ENTRYPOINT ["/service/entrypoint.sh"]
