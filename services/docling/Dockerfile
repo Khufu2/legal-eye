@@ -13,7 +13,7 @@ RUN apt-get update \
 
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
-COPY app.py pipeline.py worker.py ./
+COPY app.py pipeline.py worker.py fallback.py ./
 
 RUN useradd --create-home --uid 10001 parser && mkdir -p /models/docling && chown -R parser:parser /service /models/docling
 USER parser
