@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import os
 import subprocess
 import tempfile
@@ -14,6 +15,7 @@ from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 
 MAX_BYTES = int(os.environ.get("SCANNER_MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 SCANNER_TOKEN = os.environ.get("SCANNER_TOKEN", "")
+LOGGER = logging.getLogger("legal_eye.malware_scanner")
 app = FastAPI(title="Legal Eye Malware Scanner", docs_url=None, redoc_url=None)
 
 
@@ -81,11 +83,15 @@ async def scan(
                 "signature": signature,
                 "sha256": digest.hexdigest(),
             }
+        LOGGER.error(
+            "ClamAV scan failed",
+            extra={"returncode": result.returncode, "scanner_output": output[:500]},
+        )
         raise HTTPException(status_code=503, detail="ClamAV scan failed")
     except subprocess.TimeoutExpired as error:
+        LOGGER.error("ClamAV scan timed out", extra={"timeout_seconds": 180})
         raise HTTPException(status_code=503, detail="ClamAV scan timed out") from error
     finally:
         await file.close()
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
-
