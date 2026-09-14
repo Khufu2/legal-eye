@@ -19,6 +19,15 @@ jobs:
           fetch-depth: 0
       - name: Apply runtime patch
         run: python scripts/patch_runtime_low_memory.py
+      - name: Normalize generated parser source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('services/docling/app.py')
+          text = path.read_text()
+          text = text.replace('payload["derived_markdown"] = "\n\n".join', 'payload["derived_markdown"] = "\\n\\n".join')
+          path.write_text(text)
+          PY
       - name: Validate Python
         run: python -m py_compile services/docling/worker.py services/docling/fallback.py services/docling/app.py services/scanner/app.py
       - name: Commit runtime patch
