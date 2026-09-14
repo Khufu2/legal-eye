@@ -144,3 +144,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   }
   .prompt-grid > button:hover, .findings > button:hover { transform: none; }
 }
+
+.vault-document { display:flex; align-items:center; gap:14px; min-height:76px; padding:18px; border:1px solid var(--le-soft-border); border-radius:12px; }
+.vault-document > i { display:grid; place-items:center; flex:0 0 36px; height:36px; border-radius:10px; border:1px solid var(--le-soft-border); }
+.vault-document > span { display:grid; gap:4px; min-width:0; }
+.vault-document b, .vault-document small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
