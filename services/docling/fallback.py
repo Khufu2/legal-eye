@@ -1,13 +1,14 @@
-"""Fallback extraction and local malware scanning for Legal Eye processing.
+"""Fallback extraction and low-memory content safety for Legal Eye processing.
 
-Docling remains the preferred parser. This module exists so a Docling or Railway
-private-network outage cannot prevent a clean document from becoming searchable.
+Docling remains the preferred parser. The remote scanner remains the preferred
+content-safety service. This module provides a deterministic low-memory fallback
+so a scanner outage cannot strand otherwise parseable documents in the queue.
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
+import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -54,23 +55,85 @@ def _split_text(value: str, max_chars: int = 2600) -> list[str]:
     return chunks
 
 
-def local_malware_scan(path: Path) -> dict[str, Any]:
+def _scan_stream_for_tokens(path: Path, tokens: tuple[bytes, ...]) -> bytes | None:
+    lowered = tuple(token.lower() for token in tokens)
+    carry = b""
+    longest = max((len(token) for token in lowered), default=1)
+    with path.open("rb") as source:
+        while block := source.read(1024 * 1024):
+            window = (carry + block).lower()
+            for token in lowered:
+                if token in window:
+                    return token
+            carry = window[-(longest - 1):] if longest > 1 else b""
+    return None
+
+
+def _scan_ooxml(path: Path) -> None:
     try:
-        result = subprocess.run(
-            ["clamscan", "--no-summary", "--infected", str(path)],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise PipelineError("local_scanner_unavailable", "Local malware scanner is unavailable") from error
-    output = (result.stdout or result.stderr or "").strip()
-    if result.returncode == 0:
-        return {"scanner": "clamav-local", "signature": None, "fallback": True}
-    if result.returncode == 1:
-        signature = output.rsplit(": ", 1)[-1].removesuffix(" FOUND") if output else "unknown"
-        raise PipelineError("malware_detected", f"Source failed malware validation ({signature})", False)
-    raise PipelineError("local_scanner_unavailable", "Local malware scanner failed")
+        with zipfile.ZipFile(path) as archive:
+            infos = archive.infolist()
+            if not infos or len(infos) > 20_000:
+                raise PipelineError("unsafe_archive", "Office document archive structure is invalid", False)
+            total_uncompressed = 0
+            blocked_suffixes = (
+                "/vbaproject.bin", ".exe", ".dll", ".com", ".scr", ".ps1", ".vbs", ".vbe", ".js", ".jse", ".bat", ".cmd",
+            )
+            blocked_markers = ("/embeddings/", "/activex/", "/oleobject")
+            for info in infos:
+                normalized = info.filename.replace("\\", "/").lower()
+                parts = [part for part in normalized.split("/") if part]
+                if normalized.startswith("/") or ".." in parts:
+                    raise PipelineError("unsafe_archive_path", "Office document contains an unsafe archive path", False)
+                if info.flag_bits & 0x1:
+                    raise PipelineError("encrypted_archive", "Encrypted Office documents are not accepted for automated processing", False)
+                total_uncompressed += max(info.file_size, 0)
+                if total_uncompressed > 250 * 1024 * 1024:
+                    raise PipelineError("archive_too_large", "Expanded Office document exceeds the safety limit", False)
+                if info.compress_size > 0 and info.file_size > 10 * 1024 * 1024 and info.file_size / info.compress_size > 250:
+                    raise PipelineError("suspicious_compression", "Office document exceeds the compression-ratio safety limit", False)
+                if normalized.endswith(blocked_suffixes) or any(marker in f"/{normalized}" for marker in blocked_markers):
+                    raise PipelineError("active_content_blocked", "Office document contains active or embedded executable content", False)
+    except PipelineError:
+        raise
+    except (OSError, zipfile.BadZipFile) as error:
+        raise PipelineError("invalid_office_document", "Office document container is invalid", False) from error
+
+
+def local_malware_scan(path: Path) -> dict[str, Any]:
+    """Low-memory fallback gate for accepted Legal Eye document formats.
+
+    This is deliberately described as content-safety scanning, not signature AV.
+    It blocks active payloads and parser-abuse patterns while the remote scanner is
+    unavailable, and records that provenance for later audit.
+    """
+    suffix = path.suffix.lower()
+    size = path.stat().st_size
+    if size <= 0 or size > 100 * 1024 * 1024:
+        raise PipelineError("unsafe_file_size", "Document size is outside the content-safety policy", False)
+
+    if suffix == ".pdf":
+        with path.open("rb") as source:
+            if source.read(5) != b"%PDF-":
+                raise PipelineError("invalid_pdf_signature", "PDF signature is invalid", False)
+        token = _scan_stream_for_tokens(path, (b"/JavaScript", b"/Launch", b"/EmbeddedFile", b"/RichMedia"))
+        if token:
+            raise PipelineError("active_content_blocked", f"PDF active content is blocked ({token.decode('ascii', 'ignore')})", False)
+    elif suffix in {".docx", ".xlsx"}:
+        _scan_ooxml(path)
+    elif suffix in {".txt", ".html", ".htm"}:
+        token = _scan_stream_for_tokens(path, (b"<script", b"javascript:", b"data:text/html"))
+        if token:
+            raise PipelineError("active_content_blocked", "Text document contains active web content", False)
+    else:
+        raise PipelineError("unsupported_safety_format", f"Content-safety fallback does not accept {suffix or 'this format'}", False)
+
+    return {
+        "scanner": "static-content-safety",
+        "signature": "active-content-archive-policy-v1",
+        "fallback": True,
+        "signature_antivirus": False,
+    }
 
 
 def _text_nodes_from_pdf(path: Path) -> list[dict[str, Any]]:
