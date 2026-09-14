@@ -1,5 +1,6 @@
 import { generateText, gateway, Output } from "ai";
 import { z } from "zod";
+import { fetchOfficialSourceEvidence } from "./public-source-fallback";
 
 export const maxDuration = 60;
 
@@ -116,8 +117,24 @@ export async function POST(request: Request) {
         use_firm_knowledge: input.use_firm_knowledge ?? true,
         data_classification: "confidential",
       });
-      const publicEvidence = (evidence.publicEvidence ?? []) as Evidence[];
+      let publicEvidence = (evidence.publicEvidence ?? []) as Evidence[];
       const privateEvidence = (evidence.privateEvidence ?? []) as Evidence[];
+      if (!publicEvidence.length && !privateEvidence.length && (input.jurisdictions ?? ["TZ"]).includes("TZ")) {
+        const onDemand = await fetchOfficialSourceEvidence({
+          query: input.query,
+          jurisdictions: input.jurisdictions ?? ["TZ"],
+          token,
+          supabaseUrl,
+          supabaseKey,
+        });
+        if (onDemand.length) {
+          publicEvidence = onDemand;
+          evidence.publicEvidence = onDemand;
+          evidence.retrievalState = "official-on-demand";
+          evidence.retrieval_state = "official-on-demand";
+          evidence.exactSourceFallback = true;
+        }
+      }
       if (!publicEvidence.length && !privateEvidence.length) return response(evidence);
       const format = (rows: Evidence[], prefix: string) => rows.map((row, index) =>
         `[${prefix}${index + 1}] ${row.title ?? "Untitled"} ${row.citation ?? ""}\n${row.content ?? ""}`
