@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/public-source-fallback-apply.yml'
+      - 'scripts/apply_public_source_fallback.py'
   workflow_dispatch:
 
 permissions:
