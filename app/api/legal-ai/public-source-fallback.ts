@@ -16,7 +16,7 @@ export type OfficialEvidence = {
   title: string;
   citation?: string;
   content: string;
-  pageNumber: number;
+  page_number: number;
   canonical_url: string | null;
   source_url: string;
   jurisdiction_code: string;
@@ -170,7 +170,7 @@ async function extractCandidate(document: CatalogDocument, terms: string[]): Pro
           title: document.title,
           citation: document.citation ?? undefined,
           content: passage,
-          pageNumber: page.pageNumber,
+          page_number: page.pageNumber,
           canonical_url: document.canonical_url ?? null,
           source_url: sourceUrl,
           jurisdiction_code: document.jurisdiction_code,
