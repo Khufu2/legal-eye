@@ -1,0 +1,26 @@
+name: Apply Legal Eye Truthful Status
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/legal-eye-truthful-status.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Reflect live processing state
+        run: python scripts/patch_truthful_status.py
+      - name: Commit truthful status
+        run: |
+          git config user.name "legal-eye-automation"
+          git config user.email "actions@users.noreply.github.com"
+          rm .github/workflows/legal-eye-truthful-status.yml scripts/patch_truthful_status.py
+          git add app/page.tsx app/refinement.css .github/workflows/legal-eye-truthful-status.yml scripts/patch_truthful_status.py
+          git commit -m "Reflect live search indexing state"
+          git push origin main
