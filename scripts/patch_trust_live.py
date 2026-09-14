@@ -15,3 +15,4 @@ if '/* Live Trust console */' not in t:
 '''
     css.write_text(t)
 print('trust live activated')
+# trigger
