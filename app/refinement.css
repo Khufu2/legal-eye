@@ -1,0 +1,137 @@
+/* Final visual refinement layer for the published Legal Eye interface. */
+:root {
+  --le-reading: 16px;
+  --le-leading: 1.62;
+  --le-panel-radius: 16px;
+  --le-soft-border: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+html { font-size: 16px; }
+body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+
+.view-pad { padding: clamp(24px, 3vw, 48px); }
+.section-header { gap: 24px; margin-bottom: clamp(26px, 3vw, 44px); align-items: flex-start; }
+.section-header h1 { font-size: clamp(2rem, 2.8vw, 2.75rem); line-height: 1.08; letter-spacing: -0.035em; }
+.section-header p { max-width: 760px; margin-top: 10px; font-size: 1rem; line-height: 1.65; }
+
+.context-head { min-height: 64px; padding-inline: clamp(16px, 2.2vw, 32px); }
+.context-head > div { gap: 10px; }
+.context-head button, .context-pill { min-height: 36px; }
+
+.legal-sidebar [data-sidebar="menu-button"] { min-height: 38px; font-size: 0.92rem; }
+.brand-head { min-height: 70px; gap: 10px !important; }
+.brand-head b { font-size: 1rem; }
+.brand-head small { font-size: 0.74rem; }
+
+.composer { padding: clamp(18px, 2.5vw, 30px); border-radius: var(--le-panel-radius); }
+.composer textarea { min-height: 132px; font-size: 1.05rem !important; line-height: 1.6; }
+.prompt-grid { gap: 14px; margin-top: 20px; }
+.prompt-grid > button { min-height: 150px; padding: 22px; border-radius: 14px; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
+.prompt-grid > button:hover { transform: translateY(-2px); }
+.prompt-grid strong { font-size: 1.02rem; }
+.prompt-grid span { font-size: 0.92rem; line-height: 1.55; }
+
+.research-bar { min-height: 62px; padding: 10px 16px; gap: 12px; }
+.research-bar input { min-height: 40px; font-size: 1rem; }
+.research-grid { min-height: calc(100svh - 126px); }
+.plan-pane, .answer-pane, .source-viewer { min-width: 0; }
+.pane-title { min-height: 52px; padding-inline: 18px; font-size: 0.82rem; letter-spacing: .025em; }
+.plan-block { padding: 20px 18px; }
+.plan-block p, .authority-mini span { font-size: 0.94rem; line-height: 1.55; }
+.answer-head { min-height: 64px; padding: 14px clamp(18px, 2vw, 28px); }
+.answer-content { padding: clamp(24px, 3.4vw, 52px); max-width: 900px; margin: 0 auto; font-size: var(--le-reading); line-height: var(--le-leading); }
+.answer-content h2 { font-size: clamp(1.65rem, 2.2vw, 2.15rem); line-height: 1.18; letter-spacing: -0.025em; }
+.answer-content h3 { margin-top: 2rem; font-size: 1.18rem; }
+.live-answer p { white-space: pre-wrap; font-size: 1.02rem; line-height: 1.72; }
+.answer-metrics { gap: 12px; margin-top: 30px; }
+.answer-metrics > div { min-height: 82px; padding: 16px; border-radius: 12px; }
+
+.source-body { padding: 24px 22px 32px; font-size: 0.95rem; line-height: 1.62; }
+.source-body h2 { margin-top: 8px; font-size: 1.35rem; line-height: 1.25; }
+.source-body blockquote { margin-block: 18px; padding: 18px 18px 18px 22px; border-radius: 12px; font-size: 1rem; line-height: 1.72; }
+.source-actions { gap: 10px; flex-wrap: wrap; }
+.citation-chip { min-width: 26px; min-height: 26px; }
+
+.review-summary { gap: 12px; margin-bottom: 20px; }
+.review-summary > div { min-height: 86px; padding: 18px; border-radius: 12px; }
+.findings { gap: 10px; }
+.findings > button { padding: 18px 20px; border-radius: 12px; text-align: left; transition: transform 150ms ease, background 150ms ease; }
+.findings > button:hover { transform: translateY(-1px); }
+.findings h3 { font-size: 1.02rem; }
+.findings p { font-size: 0.94rem; line-height: 1.55; }
+
+.doc-toolbar, .page-toolbar, .table-toolbar { min-height: 62px; padding-inline: clamp(16px, 2vw, 30px); }
+.doc-page { padding: clamp(30px, 5vw, 72px); }
+.doc-page textarea { min-height: 360px; font-size: 1rem; line-height: 1.7; }
+.ai-card { padding: 18px; border-radius: 12px; }
+
+.legal-table { border-radius: 14px; overflow: auto; }
+.legal-table th, .legal-table td, .checklist th, .checklist td { padding: 14px 16px !important; font-size: 0.9rem; vertical-align: top; }
+.legal-table th, .checklist th { font-size: 0.75rem; letter-spacing: .035em; text-transform: uppercase; }
+.review-cell { min-width: 150px; line-height: 1.45; }
+
+.vault-grid, .monitor-grid, .skills-grid, .agent-grid { gap: clamp(16px, 2vw, 28px); }
+.vault-grid section > button, .skill-list > button, .matter-grid > button { min-height: 76px; padding: 18px; border-radius: 12px; }
+.corpus-strip { gap: 12px; }
+.corpus-strip > div { min-height: 106px; padding: 18px; border-radius: 12px; }
+.monitor-grid article { padding: clamp(18px, 2.2vw, 28px); }
+.empty-live { padding: clamp(34px, 6vw, 72px) 24px; }
+.empty-live h2 { font-size: 1.2rem; }
+.empty-live p { max-width: 560px; font-size: 0.95rem; line-height: 1.6; }
+
+button, a, input, textarea { scroll-margin: 12px; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible { outline-offset: 2px; }
+
+@keyframes le-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.view-pad, .research-page, .draft-view, .tables-view { animation: le-enter 220ms ease-out both; }
+
+@media (max-width: 1100px) {
+  .research-grid { grid-template-columns: minmax(190px, 0.7fr) minmax(0, 1.8fr); }
+  .research-grid > .source-viewer { display: none; }
+}
+
+@media (max-width: 820px) {
+  .view-pad { padding: 22px 16px 34px; }
+  .context-head { min-height: 58px; padding-inline: 10px; }
+  .context-head > div:last-child .context-pill,
+  .context-head > div:last-child .privacy-pill,
+  .context-head > div:last-child .clock { display: none; }
+  .section-header { margin-bottom: 24px; }
+  .section-header h1 { font-size: 2rem; }
+  .composer { padding: 16px; }
+  .composer .options { overflow-x: auto; max-width: 70vw; padding-bottom: 2px; }
+  .prompt-grid { grid-template-columns: 1fr; }
+  .prompt-grid > button { min-height: 112px; }
+  .research-grid { display: block; min-height: auto; }
+  .plan-pane { display: none; }
+  .answer-content { padding: 24px 18px 40px; }
+  .review-summary, .corpus-strip { grid-template-columns: 1fr 1fr; }
+  .editor-grid { display: block; }
+  .outline-pane { display: none; }
+  .ai-pane { border-left: 0; border-top: 1px solid var(--le-soft-border); }
+  .doc-page { padding: 28px 18px; }
+  .system-bar { display: none; }
+}
+
+@media (max-width: 520px) {
+  .review-summary, .corpus-strip { grid-template-columns: 1fr; }
+  .composer .row.spread { align-items: flex-end; gap: 12px; }
+  .composer .options button:not(:first-child) { display: none; }
+  .research-bar { padding: 8px 10px; }
+  .research-bar .tone-badge { display: none; }
+  .source-body { padding-inline: 16px; }
+  .legal-table th, .legal-table td, .checklist th, .checklist td { padding: 12px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+  .prompt-grid > button:hover, .findings > button:hover { transform: none; }
+}
