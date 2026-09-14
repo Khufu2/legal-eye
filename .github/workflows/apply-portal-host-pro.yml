@@ -1,0 +1,25 @@
+name: Apply Portal host pro
+on:
+  push:
+    paths:
+      - scripts/patch_portal_host_pro.py
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/patch_portal_host_pro.py
+      - run: |
+          rm scripts/patch_portal_host_pro.py .github/workflows/apply-portal-host-pro.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/page.tsx scripts/patch_portal_host_pro.py .github/workflows/apply-portal-host-pro.yml
+          git commit -m "Activate expanded client Portal controls"
+          git push
