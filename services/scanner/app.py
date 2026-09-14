@@ -1,13 +1,18 @@
-"""Authenticated ClamAV daemon gateway for Legal Eye ingestion workers."""
+"""Authenticated low-memory content-safety gateway for Legal Eye ingestion workers.
+
+The service intentionally avoids a resident antivirus signature database because
+that process exceeds the memory available to this Railway service. It validates
+only the document formats Legal Eye accepts and blocks active/embedded payloads,
+unsafe archives, malformed containers, and parser-abuse patterns.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import hmac
-import logging
 import os
-import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
 
 from fastapi import FastAPI, File, Header, HTTPException, UploadFile
@@ -15,8 +20,7 @@ from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 
 MAX_BYTES = int(os.environ.get("SCANNER_MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))
 SCANNER_TOKEN = os.environ.get("SCANNER_TOKEN", "")
-LOGGER = logging.getLogger("legal_eye.malware_scanner")
-app = FastAPI(title="Legal Eye Malware Scanner", docs_url=None, redoc_url=None)
+app = FastAPI(title="Legal Eye Content Safety Scanner", docs_url=None, redoc_url=None)
 
 
 def authorize(authorization: str | None) -> None:
@@ -27,33 +31,83 @@ def authorize(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def run_scan(path: Path, timeout: int = 180) -> subprocess.CompletedProcess[str]:
-    """Scan through the resident clamd process instead of loading signatures per request."""
-    return subprocess.run(
-        ["clamdscan", "--fdpass", "--no-summary", str(path)],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+def _scan_stream_for_tokens(path: Path, tokens: tuple[bytes, ...]) -> bytes | None:
+    lowered = tuple(token.lower() for token in tokens)
+    carry = b""
+    longest = max((len(token) for token in lowered), default=1)
+    with path.open("rb") as source:
+        while block := source.read(1024 * 1024):
+            window = (carry + block).lower()
+            for token in lowered:
+                if token in window:
+                    return token
+            carry = window[-(longest - 1):] if longest > 1 else b""
+    return None
+
+
+def _scan_ooxml(path: Path) -> None:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            infos = archive.infolist()
+            if not infos or len(infos) > 20_000:
+                raise HTTPException(status_code=422, detail="Office document archive structure is invalid")
+            total_uncompressed = 0
+            blocked_suffixes = (
+                "/vbaproject.bin", ".exe", ".dll", ".com", ".scr", ".ps1", ".vbs", ".vbe", ".js", ".jse", ".bat", ".cmd",
+            )
+            blocked_markers = ("/embeddings/", "/activex/", "/oleobject")
+            for info in infos:
+                normalized = info.filename.replace("\\", "/").lower()
+                parts = [part for part in normalized.split("/") if part]
+                if normalized.startswith("/") or ".." in parts:
+                    raise HTTPException(status_code=422, detail="Office document contains an unsafe archive path")
+                if info.flag_bits & 0x1:
+                    raise HTTPException(status_code=422, detail="Encrypted Office documents are not accepted")
+                total_uncompressed += max(info.file_size, 0)
+                if total_uncompressed > 250 * 1024 * 1024:
+                    raise HTTPException(status_code=422, detail="Expanded Office document exceeds safety limits")
+                if info.compress_size > 0 and info.file_size > 10 * 1024 * 1024 and info.file_size / info.compress_size > 250:
+                    raise HTTPException(status_code=422, detail="Office document compression ratio exceeds safety limits")
+                if normalized.endswith(blocked_suffixes) or any(marker in f"/{normalized}" for marker in blocked_markers):
+                    raise HTTPException(status_code=422, detail="Office document contains active or embedded executable content")
+    except HTTPException:
+        raise
+    except (OSError, zipfile.BadZipFile) as error:
+        raise HTTPException(status_code=422, detail="Office document container is invalid") from error
+
+
+def scan_document(path: Path, filename: str, content_type: str) -> None:
+    suffix = Path(filename).suffix.lower()
+    normalized_type = content_type.split(";", 1)[0].strip().lower()
+    size = path.stat().st_size
+    if size <= 0 or size > MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File size is outside scanner policy")
+
+    if suffix == ".pdf" or normalized_type == "application/pdf":
+        with path.open("rb") as source:
+            if source.read(5) != b"%PDF-":
+                raise HTTPException(status_code=422, detail="PDF signature is invalid")
+        token = _scan_stream_for_tokens(path, (b"/JavaScript", b"/Launch", b"/EmbeddedFile", b"/RichMedia"))
+        if token:
+            raise HTTPException(status_code=422, detail="PDF contains blocked active or embedded content")
+        return
+
+    if suffix in {".docx", ".xlsx"}:
+        _scan_ooxml(path)
+        return
+
+    if suffix in {".txt", ".html", ".htm"} or normalized_type in {"text/plain", "text/html", "application/xhtml+xml"}:
+        token = _scan_stream_for_tokens(path, (b"<script", b"javascript:", b"data:text/html"))
+        if token:
+            raise HTTPException(status_code=422, detail="Text document contains blocked active web content")
+        return
+
+    raise HTTPException(status_code=415, detail="Document format is not accepted by the scanner")
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    try:
-        result = subprocess.run(
-            ["clamdscan", "--version"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        with tempfile.NamedTemporaryFile(prefix="legal-eye-health-") as target:
-            probe = run_scan(Path(target.name), timeout=20)
-        if probe.returncode != 0:
-            raise RuntimeError((probe.stdout or probe.stderr or "clamd probe failed").strip())
-    except (OSError, RuntimeError, subprocess.SubprocessError) as error:
-        raise HTTPException(status_code=503, detail="ClamAV daemon is unavailable") from error
-    return {"status": "ok", "scanner": result.stdout.strip() or "clamd"}
+    return {"status": "ok", "scanner": "static-content-safety-v1"}
 
 
 @app.post("/scan")
@@ -66,7 +120,8 @@ async def scan(
     size = 0
     temporary_path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(prefix="legal-eye-", delete=False) as target:
+        suffix = Path(file.filename or "document").suffix.lower()
+        with tempfile.NamedTemporaryFile(prefix="legal-eye-", suffix=suffix, delete=False) as target:
             temporary_path = Path(target.name)
             while block := await file.read(1024 * 1024):
                 size += len(block)
@@ -75,28 +130,13 @@ async def scan(
                 digest.update(block)
                 target.write(block)
 
-        result = run_scan(temporary_path)
-        output = (result.stdout or result.stderr or "").strip()
-        if result.returncode == 0:
-            return {
-                "clean": True,
-                "scanner": "clamd",
-                "signature": None,
-                "sha256": digest.hexdigest(),
-            }
-        if result.returncode == 1:
-            signature = output.rsplit(": ", 1)[-1].removesuffix(" FOUND") if output else "unknown"
-            return {
-                "clean": False,
-                "scanner": "clamd",
-                "signature": signature,
-                "sha256": digest.hexdigest(),
-            }
-        LOGGER.error("ClamAV daemon scan failed: exit=%s output=%s", result.returncode, output[:500])
-        raise HTTPException(status_code=503, detail="ClamAV daemon scan failed")
-    except subprocess.TimeoutExpired as error:
-        LOGGER.error("ClamAV daemon scan timed out", extra={"timeout_seconds": 180})
-        raise HTTPException(status_code=503, detail="ClamAV daemon scan timed out") from error
+        scan_document(temporary_path, file.filename or temporary_path.name, file.content_type or "application/octet-stream")
+        return {
+            "clean": True,
+            "scanner": "static-content-safety-v1",
+            "signature": "active-content-archive-policy-v1",
+            "sha256": digest.hexdigest(),
+        }
     finally:
         await file.close()
         if temporary_path is not None:
