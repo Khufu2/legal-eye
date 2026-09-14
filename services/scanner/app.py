@@ -83,10 +83,7 @@ async def scan(
                 "signature": signature,
                 "sha256": digest.hexdigest(),
             }
-        LOGGER.error(
-            "ClamAV scan failed",
-            extra={"returncode": result.returncode, "scanner_output": output[:500]},
-        )
+        LOGGER.error("ClamAV scan failed: exit=%s output=%s", result.returncode, output[:500])
         raise HTTPException(status_code=503, detail="ClamAV scan failed")
     except subprocess.TimeoutExpired as error:
         LOGGER.error("ClamAV scan timed out", extra={"timeout_seconds": 180})
