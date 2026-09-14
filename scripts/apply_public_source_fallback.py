@@ -16,7 +16,7 @@ type CatalogDocument = {
 export type OfficialEvidence = {
   legal_document_id: string;
   title: string;
-  citation: string | null;
+  citation?: string;
   content: string;
   pageNumber: number;
   canonical_url: string | null;
@@ -170,7 +170,7 @@ async function extractCandidate(document: CatalogDocument, terms: string[]): Pro
         evidence.push({
           legal_document_id: document.id,
           title: document.title,
-          citation: document.citation ?? null,
+          citation: document.citation ?? undefined,
           content: passage,
           pageNumber: page.pageNumber,
           canonical_url: document.canonical_url ?? null,
