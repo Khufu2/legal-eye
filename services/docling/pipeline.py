@@ -167,9 +167,9 @@ def extract_docling_chunks(document: dict[str, Any], language_code: str | None =
             "extraction_confidence": confidence,
             "ocr_provenance": {
                 "has_provenance": bool(node.get("prov")),
-                "source": "docling",
+                "source": str(node.get("_source") or "docling"),
             },
-            "metadata": {"docling_label": node.get("label")},
+            "metadata": {"docling_label": node.get("label"), "extractor": str(node.get("_source") or "docling")},
         })
     return chunks
 

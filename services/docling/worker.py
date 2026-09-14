@@ -18,6 +18,7 @@ from urllib.parse import quote, urljoin, urlparse
 import httpx
 
 from pipeline import PipelineError, batches, extract_docling_chunks, sha256_bytes, validate_download, validate_source_url
+from fallback import lightweight_convert, local_malware_scan
 
 
 LOGGER = logging.getLogger("legal_eye.docling_worker")
@@ -255,47 +256,62 @@ def download_public_source(url: str, allowed_host: str, target: Path) -> tuple[s
 
 def malware_scan(path: Path, content_type: str) -> dict[str, Any]:
     scanner_url = os.environ.get("MALWARE_SCANNER_URL")
-    if not scanner_url:
-        raise PipelineError("scanner_unconfigured", "Malware scanner is not configured; job remains safely queued")
-    headers: dict[str, str] = {}
-    if token := os.environ.get("MALWARE_SCANNER_TOKEN"):
-        headers["authorization"] = f"Bearer {token}"
-    with path.open("rb") as source:
-        response = httpx.post(
-            scanner_url,
-            files={"file": (path.name, source, content_type)},
-            headers=headers,
-            timeout=120,
-        )
-    if response.status_code >= 500 or response.status_code == 429:
-        raise PipelineError("scanner_unavailable", "Malware scanner is temporarily unavailable")
-    if response.status_code >= 400:
-        raise PipelineError("scanner_rejected", "Malware scanner rejected the source", False)
-    result = response.json()
-    if result.get("clean") is not True:
-        raise PipelineError("malware_detected", "Source failed malware validation", False)
-    return {"scanner": result.get("scanner", "configured-service"), "signature": result.get("signature")}
+    if scanner_url:
+        headers: dict[str, str] = {}
+        if token := os.environ.get("MALWARE_SCANNER_TOKEN"):
+            headers["authorization"] = f"Bearer {token}"
+        try:
+            with path.open("rb") as source:
+                response = httpx.post(
+                    scanner_url,
+                    files={"file": (path.name, source, content_type)},
+                    headers=headers,
+                    timeout=120,
+                )
+            if response.status_code < 500 and response.status_code != 429:
+                if response.status_code >= 400:
+                    raise PipelineError("scanner_rejected", "Malware scanner rejected the source", False)
+                result = response.json()
+                if result.get("clean") is not True:
+                    raise PipelineError("malware_detected", "Source failed malware validation", False)
+                return {"scanner": result.get("scanner", "configured-service"), "signature": result.get("signature"), "fallback": False}
+            LOGGER.warning("remote malware scanner unavailable; falling back locally", extra={"status": response.status_code})
+        except PipelineError:
+            raise
+        except (httpx.HTTPError, ValueError) as error:
+            LOGGER.warning("remote malware scanner request failed; falling back locally", extra={"error": type(error).__name__})
+    else:
+        LOGGER.warning("remote malware scanner is not configured; falling back locally")
+    return local_malware_scan(path)
 
 
 def convert(path: Path, file_name: str, content_type: str, source_hash: str) -> tuple[dict[str, Any], bytes]:
-    from docling.document_converter import DocumentConverter
+    try:
+        from docling.document_converter import DocumentConverter
 
-    result = DocumentConverter().convert(path)
-    document = result.document.export_to_dict()
-    payload = {
-        "schema": "legal-eye.docling-conversion.v1",
-        "engine": {"name": "docling", "version": "2.124.0"},
-        "source": {"file_name": file_name, "content_type": content_type, "sha256": source_hash},
-        "status": str(result.status),
-        "document": document,
-        "provenance": {
-            "confidence": getattr(result, "confidence", {}),
-            "timings": getattr(result, "timings", {}),
-            "canonical_format": "docling-json",
-        },
-    }
-    encoded_payload = json.dumps(payload, separators=(",", ":"), default=str).encode("utf-8")
-    return payload, encoded_payload
+        result = DocumentConverter().convert(path)
+        document = result.document.export_to_dict()
+        payload = {
+            "schema": "legal-eye.docling-conversion.v1",
+            "engine": {"name": "docling", "version": "2.124.0"},
+            "source": {"file_name": file_name, "content_type": content_type, "sha256": source_hash},
+            "status": str(result.status),
+            "document": document,
+            "provenance": {
+                "confidence": getattr(result, "confidence", {}),
+                "timings": getattr(result, "timings", {}),
+                "canonical_format": "docling-json",
+                "fallback": False,
+            },
+        }
+        encoded_payload = json.dumps(payload, separators=(",", ":"), default=str).encode("utf-8")
+        return payload, encoded_payload
+    except Exception as error:
+        LOGGER.warning(
+            "Docling conversion failed; using lightweight extractor",
+            extra={"file_name": file_name, "error": type(error).__name__},
+        )
+        return lightweight_convert(path, file_name, content_type, source_hash)
 
 
 def persist_public(
@@ -310,14 +326,14 @@ def persist_public(
 ) -> int:
     artifact_hash = sha256_bytes(artifact_bytes)
     legal_document_id = legal_document["id"]
-    path = f"public/{legal_document.get('jurisdiction_code') or 'ZZ'}/{legal_document_id}/{artifact_hash}.docling.json"
+    path = f"public/{legal_document.get('jurisdiction_code') or 'ZZ'}/{legal_document_id}/{artifact_hash}.canonical.json"
     api.storage_upload("legal-corpus-artifacts", path, artifact_bytes, "application/json")
     api.patch("legal_document_artifacts", f"legal_document_id=eq.{encoded(legal_document_id)}&is_canonical=is.true", {"is_canonical": False})
     artifacts = api.upsert("legal_document_artifacts", "legal_document_id,artifact_type,content_hash", [{
         "legal_document_id": legal_document_id,
         "source_object_id": source_object.get("id") if source_object else None,
         "ingestion_job_id": job["id"],
-        "artifact_type": "docling_json",
+        "artifact_type": "docling_json" if canonical["engine"]["name"] == "docling" else "lightweight_json",
         "schema_version": canonical["schema"],
         "engine_name": canonical["engine"]["name"],
         "engine_version": canonical["engine"]["version"],
@@ -341,9 +357,10 @@ def persist_public(
         ])
     structured = dict(legal_document.get("structured_content") or {})
     structured.update({
-        "format": "DOCLING_JSON",
+        "format": "DOCLING_JSON" if canonical["engine"]["name"] == "docling" else "LIGHTWEIGHT_JSON",
         "hierarchy_preserved": True,
         "parser_state": "indexed",
+        "parser_engine": canonical["engine"]["name"],
         "canonical_artifact_id": artifact_id,
         "searchable_chunk_count": len(chunks),
     })
@@ -366,13 +383,13 @@ def persist_private(
     scan: dict[str, Any],
 ) -> int:
     artifact_hash = sha256_bytes(artifact_bytes)
-    path = f"{document['organization_id']}/.artifacts/{document['id']}/{artifact_hash}.docling.json"
+    path = f"{document['organization_id']}/.artifacts/{document['id']}/{artifact_hash}.canonical.json"
     api.storage_upload("firm-vault", path, artifact_bytes, "application/json")
     api.patch("document_ingestion_artifacts", f"document_id=eq.{encoded(document['id'])}&is_canonical=is.true", {"is_canonical": False})
     artifacts = api.upsert("document_ingestion_artifacts", "document_id,artifact_type,content_hash", [{
         "document_id": document["id"],
         "ingestion_job_id": job["id"],
-        "artifact_type": "docling_json",
+        "artifact_type": "docling_json" if canonical["engine"]["name"] == "docling" else "lightweight_json",
         "schema_version": canonical["schema"],
         "engine_name": canonical["engine"]["name"],
         "engine_version": canonical["engine"]["version"],
@@ -403,7 +420,7 @@ def persist_private(
         } for chunk in group]
         api.request("POST", "/rest/v1/document_chunks", json=rows, headers={"Prefer": "return=minimal"})
     metadata = dict(document.get("metadata") or {})
-    metadata.update({"parser": "docling", "parser_state": "indexed", "canonical_artifact_hash": artifact_hash})
+    metadata.update({"parser": canonical["engine"]["name"], "parser_state": "indexed", "canonical_artifact_hash": artifact_hash})
     api.patch("documents", f"id=eq.{encoded(document['id'])}", {
         "status": "ready",
         "content_hash": source_hash,

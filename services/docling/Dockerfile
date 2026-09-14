@@ -5,6 +5,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DOCLING_ARTIFACTS_PATH=/models/docling
 
 WORKDIR /service
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y clamav clamav-freshclam \
+    && freshclam \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir .
 COPY app.py pipeline.py worker.py ./
