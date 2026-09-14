@@ -1,0 +1,94 @@
+name: Apply Legal Eye Ask Fix
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/legal-eye-ask-fix.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch current published UI surgically
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/page.tsx')
+          s = p.read_text()
+
+          replacements = []
+          replacements.append((
+          'type Source = { id:string; title:string; citation:string; court:string; date:string; treatment:string; tone:Tone; excerpt:string; note:string; url?:string };',
+          'type Source = { id:string; title:string; citation:string; court:string; date:string; treatment:string; tone:Tone; excerpt:string; note:string; url?:string; page?:number; paragraph?:string; sourceKind?:"public"|"private"; legalDocumentId?:string; privateDocumentId?:string; chunkId?:number; rank?:number };'
+          ))
+          replacements.append((
+          'type Evidence = { id?:string; title?:string; citation?:string; content?:string; jurisdiction_code?:string; document_type?:string; canonical_url?:string; page_number?:number; source_node_ref?:string };',
+          'type Evidence = { id?:string; chunk_id?:number; legal_document_id?:string; document_id?:string; title?:string; citation?:string; court?:string; content?:string; jurisdiction_code?:string; document_type?:string; canonical_url?:string; page_number?:number; paragraph_number?:string; source_node_ref?:string; rank?:number };'
+          ))
+          replacements.append((
+          '<hr/><span className="eyebrow">Relevant passage</span><blockquote>{source.excerpt}</blockquote><small>Page 14 · paragraph 37</small>\n      <hr/><div className="source-note"><ShieldCheck/><span>{source.note}</span></div>\n      <div className="source-actions"><Button variant="outline" onClick={()=>toast.success("Source pinned to matter")}>Pin to matter</Button><Button variant="outline" onClick={()=>toast.success("Citation copied")}>Copy citation</Button></div>',
+          '<hr/><span className="eyebrow">Relevant passage</span><blockquote>{source.excerpt}</blockquote>{(source.page||source.paragraph)&&<small>{[source.page?`Page ${source.page}`:null,source.paragraph?`¶ ${source.paragraph}`:null].filter(Boolean).join(" · ")}</small>}\n      <hr/><div className="source-note"><ShieldCheck/><span>{source.note}</span></div>\n      <div className="source-actions"><Button variant="outline" onClick={async()=>{try{await navigator.clipboard.writeText(source.citation);toast.success("Citation copied")}catch{toast.error("Could not copy citation")}}}>Copy citation</Button></div>'
+          ))
+          replacements.append((
+          'function Research({source,setSource,identity,connect,query,setQuery}:{source:Source;setSource:(s:Source)=>void;identity:DemoIdentity|null;connect:()=>void;query:string;setQuery:(value:string)=>void}) {\n  const [running,setRunning]=useState(false),[liveAnswer,setLiveAnswer]=useState<string|null>(null),[provider,setProvider]=useState<string|null>(null),[authorities,setAuthorities]=useState<Source[]>([]);',
+          'function Research({source,setSource,identity,connect,query,setQuery,autoRun}:{source:Source;setSource:(s:Source)=>void;identity:DemoIdentity|null;connect:()=>void;query:string;setQuery:(value:string)=>void;autoRun:number}) {\n  const [running,setRunning]=useState(false),[liveAnswer,setLiveAnswer]=useState<string|null>(null),[provider,setProvider]=useState<string|null>(null),[authorities,setAuthorities]=useState<Source[]>([]),[savedId,setSavedId]=useState<string|null>(null);\n  const autoRunSeen=useRef(0);\n  const saveResearch=async()=>{\n    if(!identity||!liveAnswer||savedId)return;\n    try{\n      const response=await fetch(SUPABASE_URL+"/rest/v1/research_sessions",{method:"POST",headers:{apikey:SUPABASE_KEY,Authorization:"Bearer "+identity.access_token,"content-type":"application/json",Prefer:"return=representation"},body:JSON.stringify({organization_id:identity.organization_id,created_by:identity.user.id,title:query.slice(0,160),jurisdiction_codes:["TZ","UK","EU"],mode:"deep",use_firm_knowledge:true,query,status:"complete",answer_markdown:liveAnswer,metadata:{provider,evidence:authorities.map(s=>({title:s.title,citation:s.citation,court:s.court,url:s.url,page:s.page,paragraph:s.paragraph,source_kind:s.sourceKind,legal_document_id:s.legalDocumentId,private_document_id:s.privateDocumentId,chunk_id:s.chunkId,rank:s.rank,excerpt:s.excerpt}))},completed_at:new Date().toISOString()})});\n      const rows=await response.json();\n      if(!response.ok||!rows?.[0]?.id)throw new Error(rows?.message||"Research could not be saved");\n      setSavedId(rows[0].id);toast.success("Research saved",{description:"The answer and exact evidence snapshot are persisted to your workspace."});\n    }catch(error){toast.error(error instanceof Error?error.message:"Research could not be saved")}\n  };'
+          ))
+          replacements.append((
+          '    setRunning(true);setLiveAnswer(null);',
+          '    setRunning(true);setLiveAnswer(null);setSavedId(null);'
+          ))
+          replacements.append((
+          '      const evidence:Evidence[]=[...(data.publicEvidence||[]),...(data.privateEvidence||[])];\n      const nextSources=evidence.map((item,index)=>({id:item.id||item.source_node_ref||String(index),title:item.title||"Untitled authority",citation:item.citation||item.source_node_ref||"Citation unavailable",court:item.jurisdiction_code||"Firm knowledge",date:item.page_number?`Page ${item.page_number}`:"",treatment:item.document_type||"Evidence",tone:"blue" as Tone,excerpt:item.content||"Exact passage unavailable.",note:"Retrieved from the governed corpus.",url:item.canonical_url}));',
+          '      const publicEvidence:Evidence[]=data.publicEvidence||[],privateEvidence:Evidence[]=data.privateEvidence||[];\n      const mapEvidence=(item:Evidence,index:number,kind:"public"|"private"):Source=>({id:item.id||item.source_node_ref||`${kind}-${item.chunk_id||index}`,title:item.title||"Untitled authority",citation:item.citation||item.source_node_ref||(kind==="private"?"Private firm document":"Citation unavailable"),court:item.court||item.jurisdiction_code||(kind==="private"?"Firm knowledge":"Governed corpus"),date:item.page_number?`Page ${item.page_number}`:"",treatment:item.document_type||(kind==="private"?"Private evidence":"Evidence"),tone:"blue",excerpt:item.content||"Exact passage unavailable.",note:kind==="private"?"Exact passage retrieved from permission-filtered firm knowledge.":"Exact passage retrieved from the governed public corpus.",url:item.canonical_url,page:item.page_number,paragraph:item.paragraph_number,sourceKind:kind,legalDocumentId:item.legal_document_id,privateDocumentId:item.document_id,chunkId:item.chunk_id,rank:item.rank});\n      const nextSources=[...publicEvidence.map((item,index)=>mapEvidence(item,index,"public")),...privateEvidence.map((item,index)=>mapEvidence(item,index,"private"))];'
+          ))
+          replacements.append((
+          '      setLiveAnswer(data.answer);setProvider(data.provider);toast.success("Live research completed",{description:`${data.evidenceCount||0} verified passages retrieved.`});',
+          '      setLiveAnswer(data.answer);setProvider(data.provider);toast.success("Live research completed",{description:`${data.evidenceCount||0} exact passages retrieved.`});'
+          ))
+          replacements.append((
+          '  };\n  return <div className="research-page">',
+          '  };\n  useEffect(()=>{if(autoRun>autoRunSeen.current&&query.trim()){autoRunSeen.current=autoRun;void run()}},[autoRun]);\n  return <div className="research-page">'
+          ))
+          replacements.append((
+          '<article className="answer-pane"><div className="answer-head"><div><span className="eyebrow">{liveAnswer?"Live answer":"Sample answer"}</span><span className="verified"><ShieldCheck/> {liveAnswer?`${provider} · governed request`:"Demonstration record"}</span></div><Button variant="ghost" size="sm">Save</Button></div>',
+          '<article className="answer-pane"><div className="answer-head"><div><span className="eyebrow">{liveAnswer?"Live answer":"Research answer"}</span><span className="verified"><ShieldCheck/> {liveAnswer?`${provider} · governed request`:"Exact evidence required"}</span></div><Button variant="ghost" size="sm" onClick={()=>void saveResearch()} disabled={!liveAnswer||!!savedId}>{savedId?"Saved":"Save"}</Button></div>'
+          ))
+          replacements.append((
+          '<div className="composer"><Textarea value={q} onChange={e=>setQ(e.target.value)} placeholder="Ask a legal question, review a clause, or start a matter workflow…"/><div className="row spread"><div className="row options"><Button variant="outline" size="sm"><Globe2/> Tanzania <ChevronDown/></Button><Button variant="ghost" size="sm"><FolderLock/> Firm knowledge</Button><Button variant="ghost" size="sm"><Upload/> Documents</Button></div><Button onClick={()=>go(q)}>Ask <ArrowUpRight/></Button></div></div>',
+          '<div className="composer"><Textarea value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")go(q)}} placeholder="Ask a legal question, review a clause, or start a matter workflow…"/><div className="row spread"><div className="row options"><ToneBadge tone="blue">Tanzania</ToneBadge><ToneBadge>Firm knowledge when permitted</ToneBadge></div><Button onClick={()=>go(q)} disabled={!q.trim()}>Ask <ArrowUpRight/></Button></div></div>'
+          ))
+          replacements.append((
+          '  const [researchQuery,setResearchQuery]=useState("");',
+          '  const [researchQuery,setResearchQuery]=useState(""),[researchRun,setResearchRun]=useState(0);'
+          ))
+          replacements.append((
+          '      sessionStorage.setItem("legal-eye-session",JSON.stringify(next));setIdentity(next);setPassword("");setAuthOpen(false);await refreshVault(next);toast.success("Organization connected");',
+          '      sessionStorage.setItem("legal-eye-session",JSON.stringify(next));setIdentity(next);setPassword("");setAuthOpen(false);await refreshVault(next);if(researchQuery.trim()){setResearchRun(x=>x+1);setView("research")}toast.success("Organization connected");'
+          ))
+          replacements.append((
+          '  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={connect} query={researchQuery} setQuery={setResearchQuery}/>:view==="ask"?<AskView go={question=>{if(question.trim())setResearchQuery(question);go("research")}}/>:',
+          '  const content=view==="research"?<Research source={source} setSource={setSource} identity={identity} connect={connect} query={researchQuery} setQuery={setResearchQuery} autoRun={researchRun}/>:view==="ask"?<AskView go={question=>{if(!question.trim())return;setResearchQuery(question);if(!identity){connect();toast("Sign in to ask Legal Eye.");return;}setResearchRun(x=>x+1);go("research")}}/>:'
+          ))
+
+          for old,new in replacements:
+              count=s.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, got {count}: {old[:120]!r}')
+              s=s.replace(old,new)
+          p.write_text(s)
+          Path('.github/workflows/legal-eye-ask-fix.yml').unlink()
+          PY
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "legal-eye-automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add app/page.tsx .github/workflows/legal-eye-ask-fix.yml
+          git commit -m "Fix authenticated Ask and exact evidence saving"
+          git push origin main
