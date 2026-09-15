@@ -31,9 +31,11 @@ Cathedral live reference: Geist typography; charcoal #242529 canvas; 76 px top n
 - Production Next.js build passed after the main functional changes.
 - Four focused core tests passed: dependency ordering, cycle/conditional blocking, query term handling, and genuine OOXML ZIP export.
 - Public-role source retrieval returned 12 passages from 7 documents with original URLs for the employment-termination query. The same authenticated-role query improved from 47.8 seconds to 13.9 seconds after indexing and a bounded public-only search function with an explicit approved/display-rights predicate. Private retrieval remains under caller RLS.
-- At 14:08 UTC: 17,015 catalogue records; 16,488 documents with searchable chunks; 138,643 chunks. Live ingestion continues; these are a timestamped observation.
+- At 19:28 UTC: 19,182 catalogue records; 18,655 documents with searchable chunks; 143,794 chunks. Live ingestion continues; these are a timestamped observation.
 - Extra Railway open-corpus deployment succeeded and logs show successful official-source fetches and Supabase chunk inserts.
 - `legal-eye-source-monitors` is active on `*/15 * * * *`.
+- Actual anonymous REST calls to `legal_corpus_overview` and `search_legal_evidence` succeeded. The former originally hit the API statement timeout; scoped RPC settings and public-only counting fixed that failure. The count request took 15.1 seconds including network overhead, so further latency optimization remains. Search returned 12 Tanzanian passages.
+- Production release `0e1dc10` reached READY and the public desktop interface was inspected. Research history now has an explicit mobile close control; session loading ignores stale requests, and editor controls prevent switching or editing during a save.
 - No authenticated end-to-end success is claimed without a valid organization session.
 
 ## Official comparison sources
