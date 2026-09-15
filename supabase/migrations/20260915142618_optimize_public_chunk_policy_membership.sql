@@ -1,0 +1,1 @@
+alter policy legal_document_chunks_public_read on public.legal_document_chunks using (legal_document_id in (select d.id from public.legal_documents d join public.source_registry s on s.id=d.source_id where s.policy_state='approved' and s.commercial_display_allowed));

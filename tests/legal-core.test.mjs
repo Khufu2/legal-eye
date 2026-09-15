@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { createDocx } from '../lib/legal/docx.ts';
+import { orderWorkflow,needsApproval } from '../lib/legal/workflow.ts';
+import {searchTerms} from '../lib/legal/retrieval.ts';
+const node=(id,type='skill',y=0)=>({id,node_key:id,node_type:type,configuration:{},position:{y}});
+test('workflow respects dependencies even when nodes are returned out of order',()=>{const nodes=[node('deliver','delivery',3),node('approve','human_checkpoint',2),node('review','review',1)];const edges=[{source_node_id:'review',target_node_id:'approve',condition:{}},{source_node_id:'approve',target_node_id:'deliver',condition:{}}];assert.deepEqual(orderWorkflow(nodes,edges).map(n=>n.id),['review','approve','deliver']);assert.equal(needsApproval(nodes[1]),true);assert.equal(needsApproval(node('decision','decision')),true);});
+test('workflow blocks cycles and unresolved conditional branches',()=>{assert.throws(()=>orderWorkflow([node('a'),node('b')],[{source_node_id:'a',target_node_id:'b',condition:{}},{source_node_id:'b',target_node_id:'a',condition:{}}]),/circular/);assert.throws(()=>orderWorkflow([node('a'),node('b')],[{source_node_id:'a',target_node_id:'b',condition:{risk:'high'}}]),/Conditional/);});
+test('question search retains specific legal terms and removes conversational filler',()=>assert.deepEqual(searchTerms('What makes an employment termination unfair?'),['makes','employment','termination','unfair']));
+test('Word output is an OOXML archive with escaped legal text and styled headings',()=>{const output=createDocx('A & B','## Duties\n**Notice** < 30 days\nKiswahili: wajibu');const b=Buffer.from(output);assert.equal(b.readUInt32LE(0),0x04034b50);assert.equal(b.readUInt32LE(b.length-22),0x06054b50);const text=b.toString('utf8');assert.match(text,/word\/document.xml/);assert.match(text,/A &amp; B/);assert.match(text,/&lt; 30 days/);assert.match(text,/<w:b\/>/);assert.match(text,/Heading2/);assert.match(text,/wajibu/);});

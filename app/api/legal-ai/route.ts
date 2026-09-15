@@ -1,5 +1,6 @@
 import { generateText, gateway, Output } from "ai";
 import { z } from "zod";
+import { retrieveEvidence } from "@/lib/legal/retrieval";
 import { fetchOfficialSourceEvidence } from "./public-source-fallback";
 
 export const maxDuration = 60;
@@ -13,6 +14,8 @@ const requestSchema = z.object({
   organization_id: z.string().uuid(),
   query: z.string().trim().min(3).max(4_000).optional(),
   jurisdictions: z.array(z.string().trim().min(2).max(16)).max(8).optional(),
+  matter_id: z.string().uuid().nullable().optional(),
+  conversation: z.array(z.object({question:z.string().max(4000),answer:z.string().max(6000)})).max(4).optional(),
   use_firm_knowledge: z.boolean().optional(),
   document_type: z.string().trim().min(2).max(120).optional(),
   instructions: z.string().trim().min(3).max(20_000).optional(),
@@ -109,14 +112,9 @@ export async function POST(request: Request) {
 
     if (input.action === "research") {
       if (!input.query) return response({ error: "Research question required" }, 400);
-      const evidence = await callLegalApi(token, {
-        action: "research",
-        query: input.query,
-        jurisdictions: input.jurisdictions ?? ["TZ"],
-        organization_id: input.organization_id,
-        use_firm_knowledge: input.use_firm_knowledge ?? true,
-        data_classification: "confidential",
-      });
+      const previous = input.conversation?.at(-1)?.question;
+      const retrievalQuery = previous && input.query.length < 120 ? `${previous} ${input.query}` : input.query;
+      const evidence: Record<string, any> = await retrieveEvidence({ url:supabaseUrl,key:supabaseKey,authorization,query:retrievalQuery,jurisdictions:input.jurisdictions ?? ["TZ"],organizationId:input.organization_id,matterId:input.matter_id,privateContext:input.use_firm_knowledge ?? true });
       let publicEvidence = (evidence.publicEvidence ?? []) as Evidence[];
       const privateEvidence = (evidence.privateEvidence ?? []) as Evidence[];
       if (!publicEvidence.length && !privateEvidence.length && (input.jurisdictions ?? ["TZ"]).includes("TZ")) {
@@ -135,11 +133,11 @@ export async function POST(request: Request) {
           evidence.exactSourceFallback = true;
         }
       }
-      if (!publicEvidence.length && !privateEvidence.length) return response(evidence);
+      if (!publicEvidence.length && !privateEvidence.length) return response({...evidence,answer:"Insufficient evidence: no matching source passages were found in the selected jurisdictions or accessible firm documents. Try naming the Act, legal issue, or relevant clause. This result does not establish that no authority exists."});
       const format = (rows: Evidence[], prefix: string) => rows.map((row, index) =>
         `[${prefix}${index + 1}] ${row.title ?? "Untitled"} ${row.citation ?? ""}\n${row.content ?? ""}`
       ).join("\n\n");
-      const prompt = dlp(`Research question: ${input.query}\nJurisdictions: ${(input.jurisdictions ?? ["TZ"]).join(", ")}\n\nPUBLIC EVIDENCE:\n${format(publicEvidence, "P")}\n\nPRIVATE FIRM EVIDENCE:\n${format(privateEvidence, "F")}`);
+      const prompt = dlp(`Prior conversation (context only, not verified authority): ${JSON.stringify(input.conversation || [])}\nResearch question: ${input.query}\nJurisdictions: ${(input.jurisdictions ?? ["TZ"]).join(", ")}\n\nPUBLIC EVIDENCE:\n${format(publicEvidence, "P")}\n\nPRIVATE FIRM EVIDENCE:\n${format(privateEvidence, "F")}`);
       const generated = await generateText({
         model: gateway(modelName),
         system: "You are a legal research assistant. Use only supplied evidence. Never invent authorities, quotations, paragraph numbers, holdings, or facts. Distinguish binding public authority from private firm material. If evidence is insufficient, state that prominently. Return: Short Answer; Analysis; Key Authorities; Contrary or Limiting Authorities; Practical Implications; Uncertainties. Cite evidence labels exactly. This is lawyer decision-support and requires verification.",
@@ -152,7 +150,7 @@ export async function POST(request: Request) {
 
     if (input.action === "draft") {
       if (!input.instructions) return response({ error: "Drafting instructions required" }, 400);
-      const prompt = dlp(`Document type: ${input.document_type ?? "Legal memorandum"}\nJurisdiction: Tanzania\nInstructions: ${input.instructions}\nVerified context supplied by the lawyer:\n${input.context ?? "None"}`);
+      const prompt = dlp(`Document type: ${input.document_type ?? "Legal memorandum"}\nJurisdictions: ${(input.jurisdictions ?? ["TZ"]).join(", ")}\nInstructions: ${input.instructions}\nVerified context supplied by the lawyer:\n${input.context ?? "None"}`);
       const generated = await generateText({
         model: gateway(modelName),
         system: "You are a senior legal drafting assistant. Draft conservatively, never invent legal authority or facts, preserve [PLACEHOLDER] markers for missing facts, mark assumptions, and use professional legal structure. Begin with 'AI DRAFT — LAWYER REVIEW REQUIRED'.",
