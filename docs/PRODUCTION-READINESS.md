@@ -1,17 +1,17 @@
 # Production readiness gate
 
-Status as of 2026-09-04: **foundation implemented; external production controls not yet accepted**.
+Status as of 2026-09-16: **foundation implemented; external production controls not yet accepted**.
 This is the release gate for an institution comparable to Goldman Sachs or J.P. Morgan.
 
 | Gate | Current evidence | Acceptance requirement |
 | --- | --- | --- |
 | Application and design system | Legal Eye premium workspace and connected modules build successfully | Accessibility, performance and browser matrix signed off |
 | Database isolation | RLS on product/control tables; public catalog constrained by source policy | Automated tenant/matter isolation suite and independent review |
-| AI routing | Gemini-first/OpenRouter-fallback gateway with DLP and hash-only telemetry | Keys, contracts, regional routing, red-team and quality/cost SLOs |
-| Document parsing | Private Docling service image and structural artifact model | Deployed private service, malware gate, golden corpus and load tests |
+| AI routing | Vercel AI Gateway; authenticated research/editor requests blocked pending billing activation | Keys, contracts, regional routing, red-team and quality/cost SLOs |
+| Document parsing | Private Docling worker processed a synthetic upload to a searchable chunk; JSON artifact MIME and infrastructure retry fixed | Deployed private service, malware gate, golden corpus and load tests |
 | Agent orchestration | LangGraph service with visible events and human checkpoint | Deployed service, durable retry/replay tests and failure injection |
 | OpenContracts | Audited commit and isolated service build definition | Deployed API/workers, adapter contract tests and security hardening |
-| Corpus | 20 official UK metadata records with provenance and policy gate | Licensed source agreements, full structural bodies, reconciliation and lawyer QA |
+| Corpus | 19,182 catalogue records across TZ, UK, EU, CA and AU; UK pagination fix committed; Australian 403 source paused | Licensed source agreements, full structural bodies, reconciliation and lawyer QA |
 | SSO/SCIM | SCIM endpoint implemented; SAML schema/policies prepared | Supabase Pro, IdP metadata/domain, conformance and lifecycle tests |
 | Encryption/DLP | Classification, DLP events and KMS reference model | Cloud KMS/CMEK deployed, rotation/revocation and data-loss exercises |
 | Evaluation | Synthetic smoke set plus 20 source-backed UK normalization cases | Lawyer-authored African/global gold sets, thresholds, regression and bias review |

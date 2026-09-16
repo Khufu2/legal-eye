@@ -54,3 +54,9 @@ Cathedral live reference: Geist typography; charcoal #242529 canvas; 76 px top n
 [Agent](https://legora.com/product/agent), [Legal Research](https://legora.com/product/legal-research), [Tabular Review](https://legora.com/product/tabular-review), [Editor](https://legora.com/product/editor), [Workflows](https://legora.com/product/workflows), [Lists](https://legora.com/product/lists), [Monitors](https://legora.com/product/monitors), [Portal](https://legora.com/product/portal), [Word](https://legora.com/product/word-add-in), [Outlook](https://legora.com/product/outlook-add-in), [Mobile](https://legora.com/product/mobile-app).
 
 Legora's publisher partnerships and geographic coverage are commercial/data work in addition to software. Legal Eye must obtain the necessary licensed sources; adding public legislation does not establish corpus parity.
+
+## Follow-up hardening — 16 September 2026
+
+Workflow creation now uses one security-invoker database transaction for the workflow, nodes and edges. It validates unique keys, supported step types and a lawyer approval checkpoint. Anonymous execution is revoked; existing caller RLS remains authoritative. The production build and four core tests pass. Authenticated AI-driven creation remains blocked by Gateway billing and is not claimed as verified.
+
+The UK pagination and source failure-backoff worker changes are committed with five passing ingestion tests. Deployment must select the new commit explicitly: Railway redeploy reuses its previous commit. The Australian source is paused after repeated HTTP 403 responses. Catalogue size remains 19,182 at this checkpoint; no additional live ingestion is claimed without database evidence.
