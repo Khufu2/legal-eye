@@ -57,3 +57,11 @@ publishing chunks and marks a job complete only after all persistence succeeds.
 This code and migration do not mean the live queue has been drained. The worker image, scanner,
 Supabase secret, private networking and service identity must be deployed and a controlled batch
 must complete before any record is reported as searchable.
+
+## 16 September 2026: resumable UK collection
+
+The open-corpus worker now follows the official UK Atom feed's next links and checkpoints each processed entry. XML bodies are indexed; PDF-only entries are counted as coverage gaps, not claimed as searchable documents. UK versions are explicitly labelled as made/enacted, with subsequent amendments unverified. Completed feed traversals wait 24 hours before restarting.
+
+Source HTTP 401/403 responses preserve the cursor and pause subsequent attempts until source access is reviewed. Other failures receive exponential retry delays. The observed Australian API denial at offset 7,560 must be resolved with the source operator; retries do not bypass it. Existing licensing gates remain mandatory.
+
+Verification: five focused Python tests cover pagination, resumption, download failures, invalid links/entities and access-denial handling. A retrieved official UK CLML document produced searchable text. This establishes ingestion behavior, not comprehensive or legally current coverage.

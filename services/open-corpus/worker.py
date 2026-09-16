@@ -8,11 +8,12 @@ import logging
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -141,7 +142,7 @@ def get_cursor(api: Api, source_id: str) -> dict[str, Any]:
 
 
 def set_cursor(api: Api, source_id: str, cursor: dict[str, Any]) -> None:
-    api.upsert("source_sync_cursors", "source_id", [{"source_id": source_id, "cursor": cursor, "consecutive_failures": 0, "updated_at": now()}])
+    api.upsert("source_sync_cursors", "source_id", [{"source_id": source_id, "cursor": cursor, "consecutive_failures": 0, "next_attempt_at": None, "updated_at": now()}])
     api.patch("source_registry", f"id=eq.{enc(source_id)}", {"last_synced_at": now()})
 
 
@@ -162,7 +163,7 @@ def persist_document(api: Api, source: dict[str, Any], *, external_id: str, cano
     values = {
         "source_id": source["id"], "canonical_source_id": external_id, "canonical_url": canonical_url,
         "jurisdiction_code": jurisdiction, "document_type": document_type, "title": title[:500], "citation": citation,
-        "published_at": published_at, "current_status": "published", "version_label": "official current expression",
+        "published_at": published_at, "current_status": "published", "version_label": metadata.get("version_label", "Source version retrieved " + now()[:10]),
         "language": "en", "structured_content": {"format": "OFFICIAL_STRUCTURED_TEXT", "hierarchy_preserved": False,
         "parser_state": "indexed", "parser_engine": "open-corpus-worker", "searchable_chunk_count": len(pieces)},
         "content_hash": content_hash, "retrieved_at": now(), "updated_at": now(),
@@ -282,6 +283,90 @@ def process_australia(api: Api, source: dict[str, Any], limit: int) -> int:
     return completed
 
 
+ATOM = {"a": "http://www.w3.org/2005/Atom"}
+
+
+def uk_url(value: str) -> str:
+    value = value.replace("http://", "https://", 1)
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or parsed.hostname != "www.legislation.gov.uk" or parsed.username or parsed.password:
+        raise ValueError("Unexpected UK legislation link")
+    return value
+
+
+def uk_feed(raw: str) -> tuple[list[dict[str, Any]], str | None]:
+    if "<!ENTITY" in raw.upper():
+        raise ValueError("XML entities are not supported")
+    root = ET.fromstring(raw)
+    entries = []
+    for entry in root.findall("a:entry", ATOM):
+        links = entry.findall("a:link", ATOM)
+        xml_link = next((link.get("href") for link in links if link.get("type") == "application/xml" and (link.get("href") or "").endswith("/data.xml")), None)
+        entries.append({"id": entry.findtext("a:id", default="", namespaces=ATOM),
+                        "title": entry.findtext("a:title", default="Untitled legislation", namespaces=ATOM),
+                        "published": entry.findtext("a:published", namespaces=ATOM), "xml_url": uk_url(xml_link) if xml_link else None})
+    next_link = next((link.get("href") for link in root.findall("a:link", ATOM) if link.get("rel") == "next"), None)
+    return entries, uk_url(next_link) if next_link else None
+
+
+def process_uk(api: Api, source: dict[str, Any], limit: int) -> int:
+    cursor = get_cursor(api, source["id"])
+    feed_url = uk_url(cursor.get("uk_next_feed") or "https://www.legislation.gov.uk/all/data.feed?sort=published&page=1")
+    response = api.client.get(feed_url, headers={"accept": "application/atom+xml"}, follow_redirects=True)
+    response.raise_for_status()
+    entries, next_url = uk_feed(response.text)
+    offset = int(cursor.get("uk_entry_offset", 0))
+    processed = 0
+    skipped = int(cursor.get("uk_non_xml_entries", 0))
+    for index, item in enumerate(entries[offset:offset + limit], start=offset):
+        if not item["xml_url"]:
+            skipped += 1  # PDF-only and correction-slip coverage is explicitly recorded.
+        else:
+            document = api.client.get(item["xml_url"], headers={"accept": "application/xml"}, follow_redirects=True)
+            document.raise_for_status()
+            if "<Legislation" not in document.text:
+                raise ValueError("UK source did not return a full CLML document")
+            persist_document(api, source, external_id=item["id"], canonical_url=item["xml_url"].removesuffix("/data.xml"),
+                             jurisdiction="UK", document_type="legislation", title=item["title"], citation=None,
+                             published_at=item["published"], raw=document.text, media_type="application/xml",
+                             metadata={"feed": feed_url, "version_label": "As made/enacted; subsequent amendments not verified"})
+            processed += 1
+        cursor.update({"uk_next_feed": feed_url, "uk_entry_offset": index + 1, "uk_non_xml_entries": skipped})
+        set_cursor(api, source["id"], cursor)
+    if offset + limit >= len(entries):
+        cursor.update({"uk_next_feed": next_url, "uk_entry_offset": 0, "uk_backfill_complete": next_url is None})
+        set_cursor(api, source["id"], cursor)
+        if next_url is None:
+            api.patch("source_sync_cursors", f"source_id=eq.{enc(source['id'])}", {"next_attempt_at": (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()})
+    return processed
+
+
+def source_ready(api: Api, source: dict[str, Any]) -> bool:
+    rows = api.rows("source_sync_cursors", f"select=cursor,next_attempt_at&source_id=eq.{enc(source['id'])}&limit=1")
+    if not rows:
+        return True
+    row = rows[0]
+    if (row.get("cursor") or {}).get("access_blocked"):
+        LOGGER.warning("source requires access review: %s", source.get("name", source["id"]))
+        return False
+    retry_at = row.get("next_attempt_at")
+    return not retry_at or datetime.fromisoformat(retry_at.replace("Z", "+00:00")) <= datetime.now(timezone.utc)
+
+
+def record_failure(api: Api, source: dict[str, Any], error: Exception) -> None:
+    rows = api.rows("source_sync_cursors", f"select=cursor,consecutive_failures&source_id=eq.{enc(source['id'])}&limit=1")
+    prior = rows[0] if rows else {}
+    cursor = dict(prior.get("cursor") or {})
+    count = int(prior.get("consecutive_failures") or 0) + 1
+    status = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+    cursor.update({"last_error_at": now(), "last_http_status": status, "last_error_type": type(error).__name__})
+    if status in (401, 403):
+        cursor["access_blocked"] = True
+    retry_at = (datetime.now(timezone.utc) + timedelta(minutes=min(1440, 5 * 2 ** min(count, 8)))).isoformat()
+    api.upsert("source_sync_cursors", "source_id", [{"source_id":source["id"], "cursor":cursor,
+        "consecutive_failures":count, "next_attempt_at":retry_at, "updated_at":now()}])
+
+
 def run(limit: int) -> int:
     base_url = os.environ.get("SUPABASE_URL", "").strip()
     secret = (os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
@@ -290,18 +375,21 @@ def run(limit: int) -> int:
     api = Api(base_url, secret)
     processed = 0
     try:
-        sources = [("canada_justice_xml", process_canada), ("australia_register", process_australia)]
+        sources = [("canada_justice_xml", process_canada), ("australia_register", process_australia), ("uk_legislation", process_uk)]
         each = max(1, limit // len(sources))
         for adapter, handler in sources:
             source = source_policy(api, adapter)
             if not source:
                 LOGGER.info("source not enabled", extra={"adapter": adapter})
                 continue
+            if not source_ready(api, source):
+                continue
             try:
                 count = handler(api, source, each)
                 processed += count
                 LOGGER.info("source batch complete", extra={"adapter": adapter, "processed": count})
-            except Exception:
+            except Exception as error:
+                record_failure(api, source, error)
                 LOGGER.exception("source batch failed", extra={"adapter": adapter})
         return processed
     finally:
