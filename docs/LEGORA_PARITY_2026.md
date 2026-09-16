@@ -38,6 +38,17 @@ Cathedral live reference: Geist typography; charcoal #242529 canvas; 76 px top n
 - Production release `0e1dc10` reached READY and the public desktop interface was inspected. Research history now has an explicit mobile close control; session loading ignores stale requests, and editor controls prevent switching or editing during a save.
 - No authenticated end-to-end success is claimed without a valid organization session.
 
+## Authenticated verification — 16 September 2026
+
+- Secure browser sign-in succeeded; organization workspace and persisted draft library were visible.
+- Created a clearly fictional agreement, saved version 1, navigated away, reopened it, and downloaded Word output. The downloaded DOCX passed ZIP integrity and XML parsing checks and contained the expected saved text.
+- A full employment-law question exposed a source-search timeout. Public retrieval now filters permitted jurisdictions before ranking and tries all meaningful terms together before broader fallback. The precise REST query returned 11 passages; the same full question in the authenticated browser subsequently reached AI generation.
+- AI generation is blocked by Vercel AI Gateway requiring a valid card on file. Both research and editor summarization returned that provider error. No generated answer, review, or AI workflow success is claimed.
+- Upload initially failed because INSERT plus return=representation evaluated the document SELECT policy before the new row was visible to its stable helper. Upload and pasted-source creation now use client-generated UUIDs and return=minimal, followed by normal authenticated reads. No RLS policy was weakened.
+- The synthetic TXT upload now persists and the processing API queues ingestion. The worker initially failed because the private bucket rejected its application/json parser artifact. A scoped bucket MIME migration fixed this; the retried ingestion job completed. The bucket remains private. Infrastructure failures can now be retried through the existing authenticated processing endpoint; blocked-file failures remain blocked.
+- Upload and editor AI errors now remain visible on the page.
+- Production Next.js build and the four core tests passed. Latest deployed application commit: b05a16e7c4a55670c21c3ba8538927a3b69ea4b3.
+
 ## Official comparison sources
 
 [Agent](https://legora.com/product/agent), [Legal Research](https://legora.com/product/legal-research), [Tabular Review](https://legora.com/product/tabular-review), [Editor](https://legora.com/product/editor), [Workflows](https://legora.com/product/workflows), [Lists](https://legora.com/product/lists), [Monitors](https://legora.com/product/monitors), [Portal](https://legora.com/product/portal), [Word](https://legora.com/product/word-add-in), [Outlook](https://legora.com/product/outlook-add-in), [Mobile](https://legora.com/product/mobile-app).

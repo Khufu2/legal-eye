@@ -106,10 +106,21 @@ Deno.serve(async (request: Request) => {
     const idempotencyKey = `private-docling:${document.id}:${sourceVersion}`;
     const existing = await service(
       `/rest/v1/ingestion_jobs?idempotency_key=eq.${encodeURIComponent(idempotencyKey)}` +
-        "&select=id,status,attempt_count,max_attempts,available_at,dead_lettered_at&limit=1",
+        "&select=id,status,attempt_count,max_attempts,available_at,dead_lettered_at,last_error_code&limit=1",
     );
     if (existing?.[0]) {
       const job = existing[0];
+      // Only retry infrastructure failures after the caller passed document RLS.
+      // Malware/unsupported-document failures remain blocked.
+      if (job.status === "failed" && job.last_error_code === "supabase_request_failed") {
+        const restarted = await service(`/rest/v1/ingestion_jobs?id=eq.${encodeURIComponent(job.id)}&status=eq.failed`, {
+          method: "PATCH",
+          headers: {"content-type":"application/json", Prefer:"return=representation"},
+          body: JSON.stringify({status:"queued",dead_lettered_at:null,available_at:new Date().toISOString(),error_message:null,last_error_code:null,attempt_count:0}),
+        });
+        if (restarted?.[0]) return json(request,{ok:true,status:"queued",job_id:job.id,retried:true},202);
+      }
+      if (job.status === "failed") return json(request,{error:"Processing failed. The document needs attention before it can be retried.",job_id:job.id},409);
       return json(request, {
         ok: true,
         status: job.status,
@@ -146,7 +157,7 @@ Deno.serve(async (request: Request) => {
     });
     const job = created?.[0] || (await service(
       `/rest/v1/ingestion_jobs?idempotency_key=eq.${encodeURIComponent(idempotencyKey)}` +
-        "&select=id,status,attempt_count,max_attempts,available_at,dead_lettered_at&limit=1",
+        "&select=id,status,attempt_count,max_attempts,available_at,dead_lettered_at,last_error_code&limit=1",
     ))?.[0];
     if (!job?.id) throw new Error("Could not create ingestion job");
 
