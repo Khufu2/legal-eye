@@ -32,19 +32,25 @@ export function explainableHybridScore(signals: LegalRetrievalSignals) {
 
 /** Private retrieval uses the caller JWT and matter RLS; public search enforces source display rights. */
 export function searchTerms(question: string) {
-  const stop = new Set('a an the is are was were be been being do does did what which who when where why how can could would should may might must shall i we you they it this that these those of for to from in on at by with and or but as about under please explain compare between their our your also law legal'.split(' '));
+  const stop = new Set('a an the is are was were be been being do does did what which who when where why how can could would should may might must shall i we you they it this that these those of for to from in on at by with and or but as about under please explain compare between their our your also law legal makes make cite exact relevant provisions provide explain answer question tanzania act'.split(' '));
   return [...new Set((question.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter(w => w.length > 2 && !stop.has(w)))].slice(0,18);
 }
 export async function retrieveEvidence(options: {url:string;key:string;authorization:string;query:string;jurisdictions:string[];organizationId:string;matterId?:string|null;privateContext?:boolean}) {
   const rpc = async (name:string,body:unknown) => {
     const result=await fetch(`${options.url}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:options.key,authorization:options.authorization,'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
-    if(!result.ok) throw new Error(`Source search failed (${result.status}). Please retry.`);
+    if(!result.ok) throw new Error(`${name === "search_legal_evidence" ? "Public" : "Private"} source search failed (${result.status}). Please retry.`);
     return result.json();
   };
   const terms=searchTerms(options.query);
-  const query=terms.length ? terms.map(t=>`"${t}"`).join(' OR ') : options.query;
+  const query=terms.length ? terms.map(t=>`"${t}"`).join(' ') : options.query;
+  const publicSearch = async () => {
+    const body = {p_query:query,p_jurisdictions:options.jurisdictions.length?options.jurisdictions:null,p_limit:24};
+    const precise = await rpc('search_legal_evidence',body);
+    if (precise.length || terms.length < 2) return precise;
+    return rpc('search_legal_evidence',{...body,p_query:terms.map(t=>`"${t}"`).join(' OR ')});
+  };
   const [publicEvidence,privateEvidence]=await Promise.all([
-    rpc('search_legal_evidence',{p_query:query,p_jurisdictions:options.jurisdictions.length?options.jurisdictions:null,p_limit:24}),
+    publicSearch(),
     options.privateContext ? rpc('search_private_text',{p_query:query,p_organization_id:options.organizationId,p_matter_id:options.matterId || null,p_limit:12}) : Promise.resolve([])
   ]);
   return {publicEvidence,privateEvidence,retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
