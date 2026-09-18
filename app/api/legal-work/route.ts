@@ -1,3 +1,4 @@
+import { legalModelName } from "@/lib/legal/model";
 import { generateText, gateway, Output, ToolLoopAgent, tool, isStepCount } from "ai";
 import { z } from "zod";
 import {retrieveEvidence} from "@/lib/legal/retrieval";
@@ -6,7 +7,7 @@ export const maxDuration = 60;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-const modelName = process.env.LEGAL_EYE_AI_MODEL ?? "anthropic/claude-sonnet-4.6";
+const modelName = legalModelName;
 
 const columnSchema = z.object({
   key: z.string().trim().min(1).max(80),

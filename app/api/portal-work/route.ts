@@ -1,3 +1,4 @@
+import { legalModelName } from "@/lib/legal/model";
 import { generateText, gateway, Output } from "ai";
 import { z } from "zod";
 
@@ -5,7 +6,7 @@ export const maxDuration = 60;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-const modelName = process.env.LEGAL_EYE_AI_MODEL ?? "anthropic/claude-sonnet-4.6";
+const modelName = legalModelName;
 
 const requestSchema = z.object({
   action: z.enum(["ask", "run_workflow"]),
