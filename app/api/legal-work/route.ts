@@ -1,3 +1,4 @@
+import { legalOutputSchema } from "@/lib/legal/structured-output";
 import { legalModelName } from "@/lib/legal/model";
 import { generateText, gateway, Output, ToolLoopAgent, tool, isStepCount } from "ai";
 import { z } from "zod";
@@ -146,7 +147,7 @@ export async function POST(request: Request) {
         model: gateway(modelName),
         system: "You are a legal due diligence extraction engine. Extract only what is supported by the supplied private document text. Never infer a clause that is absent. Source quotes must be verbatim snippets from the supplied text. Confidence is evidential confidence, not legal certainty.",
         prompt,
-        output: Output.object({ schema: tableOutputSchema }),
+        output: Output.object({ schema: legalOutputSchema(tableOutputSchema) }),
         providerOptions,
       });
       const normalized=(value:string)=>value.replace(/\s+/g," ").trim();
@@ -166,7 +167,7 @@ export async function POST(request: Request) {
         model: gateway(modelName),
         system: "You are a legal transaction checklist assistant. Every checklist item must be traceable to supplied text. Do not invent dates, assignees, approvals or obligations. Use null when the source does not specify a clause/page.",
         prompt,
-        output: Output.object({ schema: checklistOutputSchema }),
+        output: Output.object({ schema: legalOutputSchema(checklistOutputSchema) }),
         providerOptions,
       });
       return json({ ...generated.output, document_id: doc.id, provider: "vercel-ai-gateway", model: modelName });
@@ -179,7 +180,7 @@ export async function POST(request: Request) {
         model: gateway(modelName),
         system: "Convert the lawyer's instruction into a safe executable legal workflow graph. Use only these node types: trigger, skill, research, review, draft, decision, human_checkpoint, delivery. Include at least one human checkpoint before any delivery. Keep nodes ordered and deterministic.",
         prompt,
-        output: Output.object({ schema: workflowOutputSchema }),
+        output: Output.object({ schema: legalOutputSchema(workflowOutputSchema) }),
         providerOptions,
       });
       return json({ ...generated.output, provider: "vercel-ai-gateway", model: modelName });
@@ -201,7 +202,7 @@ export async function POST(request: Request) {
           readDocument: tool({description:"Read an explicitly selected private document. Other document IDs are unavailable.",inputSchema:z.object({document_id:z.string().uuid()}),execute:async({document_id})=>{const doc=docs.find(d=>d.id===document_id);if(!doc)throw new Error("Document is not selected or authorized");executed.push({step:executed.length+1,title:`Read ${doc.title}`,status:"complete",detail:"Processed text loaded from the authorized private document."});return {id:doc.id,title:doc.title,text:dlp(doc.text)};}})
         },
         stopWhen:isStepCount(6),
-        output:Output.object({schema:agentOutputSchema}),
+        output:Output.object({ schema: legalOutputSchema(agentOutputSchema) }),
         providerOptions,
       });
       const generated=await agent.generate({prompt:dlp(`OBJECTIVE: ${input.objective}\nAPPROVED SKILL INSTRUCTIONS: ${input.skill_instructions||"None"}\nSELECTED DOCUMENTS: ${JSON.stringify(docs.map(d=>({id:d.id,title:d.title})))}`)});

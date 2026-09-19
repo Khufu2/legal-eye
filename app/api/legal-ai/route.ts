@@ -1,3 +1,4 @@
+import { legalOutputSchema } from "@/lib/legal/structured-output";
 import { legalModelName } from "@/lib/legal/model";
 import { generateText, gateway, Output } from "ai";
 import { z } from "zod";
@@ -169,7 +170,7 @@ export async function POST(request: Request) {
       system: "You are a legal contract review assistant. Identify issues only from the supplied text and playbook. Never invent clauses, authorities, market practice, or facts. Suggested wording must be visibly treated as a lawyer-review proposal.",
       prompt,
       providerOptions: gatewayOptions,
-      output: Output.object({ schema: reviewSchema }),
+      output: Output.object({ schema: legalOutputSchema(reviewSchema) }),
     });
     const serialized = JSON.stringify(generated.output);
     await recordGeneration(token, input, prompt, serialized, generated.totalUsage, started);
