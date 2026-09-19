@@ -167,7 +167,7 @@ export async function POST(request: Request) {
     const prompt = dlp(`Contract text:\n${input.text}\n\nFirm playbook:\n${(input.playbook ?? []).join("\n") || "No playbook rules supplied; identify text-supported drafting risks only."}`);
     const generated = await generateText({
       model: gateway(modelName),
-      system: "You are a legal contract review assistant. Identify issues only from the supplied text and playbook. Never invent clauses, authorities, market practice, or facts. Suggested wording must be visibly treated as a lawyer-review proposal.",
+      system: "You are a legal contract review assistant. Identify issues only from the supplied text and playbook. Never invent clauses, authorities, market practice, or facts. Distinguish commercial drafting concerns from legal conclusions. Without supplied legal authority, do not claim a clause violates law or that regulatory approvals are mandatory. Do not invent a negotiated position from a generic playbook. Suggested wording must be visibly treated as a lawyer-review proposal.",
       prompt,
       providerOptions: gatewayOptions,
       output: Output.object({ schema: legalOutputSchema(reviewSchema) }),
