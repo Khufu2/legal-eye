@@ -44,7 +44,7 @@ export function ResearchLive({ identity, connect, initialQuery, autoRun, session
       const body = { title: next[0].question.slice(0, 160), query: next[0].question, jurisdiction_codes: jurisdictions, matter_id: scope.matterId, mode: "deep", use_firm_knowledge: scope.privateContext, status: "complete", answer_markdown: next.at(-1)!.answer, metadata: { turns: next, evidence: next.at(-1)!.evidence }, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() };
       const rows = await workspace<Session[]>(identity, currentSession.current ? `research_sessions?id=eq.${currentSession.current}&organization_id=eq.${identity.organization_id}` : "research_sessions", { method: currentSession.current ? "PATCH" : "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(currentSession.current ? body : { ...body, organization_id: identity.organization_id, created_by: identity.user.id }) });
       if (!rows[0]) throw new Error("The answer is available, but your session could not be saved.");
-      currentSession.current = rows[0].id; loadedSession.current = rows[0].id; onSession(rows[0].id); setSaved(true); await loadHistory();
+      currentSession.current = rows[0].id; loadedSession.current = rows[0].id; onSession(rows[0].id); setSaved(true); setError(""); await loadHistory();
     } finally { setSaving(false); }
   };
   const run = async (value = question) => {

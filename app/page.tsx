@@ -77,6 +77,7 @@ function VaultView({identity,documents,connect,refresh}:{identity:WorkspaceIdent
 }
 function ReviewView({identity,connect,documents,refresh}:{identity:WorkspaceIdentity|null;connect:()=>void;documents:VaultDocument[];refresh:()=>void}) {
   const [contract,setContract]=useState(""),[findings,setFindings]=useState<ReviewFinding[]>([]),[reviewing,setReviewing]=useState(false),[selectedDocument,setSelectedDocument]=useState(""),[reviewProjectId,setReviewProjectId]=useState<string|null>(null),[loadedTitle,setLoadedTitle]=useState("Pasted agreement text");
+  const [reviewError,setReviewError]=useState("");
   const [history,setHistory]=useState<Array<{id:string;document_id:string;created_at:string;overall_risk:string}>>([]);
   const loadHistory=async()=>{if(identity)setHistory(await workspace(identity,`review_projects?select=id,document_id,created_at,overall_risk&organization_id=eq.${identity.organization_id}&order=created_at.desc&limit=50`));};
   useEffect(()=>{void loadHistory().catch(()=>undefined)},[identity]);
@@ -128,7 +129,7 @@ function ReviewView({identity,connect,documents,refresh}:{identity:WorkspaceIden
   const runReview=async()=>{
     if(!identity){connect();return;}
     if(contract.trim().length<20){toast.error("Load a processed document or paste contract text first.");return;}
-    setReviewing(true);resetResults();
+    setReviewing(true);setReviewError("");resetResults();
     try{
       const documentId=selectedDocument||await createPastedSource();
       const response=await fetch("/api/legal-ai",{method:"POST",headers:{Authorization:"Bearer "+identity.access_token,"content-type":"application/json"},body:JSON.stringify({action:"review",organization_id:identity.organization_id,text:contract,playbook:["Require consent mechanics and identify closing risk.","Data protection indemnity must be proportionate and addressed against the negotiated liability cap.","Flag inconsistencies between governing law, dispute forum, and mandatory Tanzanian approvals."]})});
@@ -136,7 +137,7 @@ function ReviewView({identity,connect,documents,refresh}:{identity:WorkspaceIden
       const next=(data.findings||[]) as ReviewFinding[];setFindings(next);
       const projectId=await persistReview(documentId,{...data,findings:next});setReviewProjectId(projectId);await loadHistory();const saved=await workspace<Array<{id:string;title:string;status:string}>>(identity,`review_findings?select=id,title,status&review_project_id=eq.${projectId}`);setFindings(next.map(f=>({...f,id:saved.find(r=>r.title===f.title)?.id,status:"open"})));
       toast.success("Contract review saved",{description:`${next.length} text-supported findings were persisted for lawyer review.`});
-    }catch(error){toast.error(error instanceof Error?error.message:"Review failed")}finally{setReviewing(false)}
+    }catch(error){setReviewError(error instanceof Error?error.message:"Review failed")}finally{setReviewing(false)}
   };
   const exportReview=()=>{
     if(!reviewProjectId)return;
@@ -147,6 +148,7 @@ function ReviewView({identity,connect,documents,refresh}:{identity:WorkspaceIden
   return <div className="view-pad"><Header title="Review" meta="Playbook-backed findings, saved results and exact document text in one workspace." action={<div className="row"><Button variant="outline" onClick={exportWord} disabled={!findings.length}>Export Word</Button><Button variant="outline" onClick={exportReview} disabled={!reviewProjectId}>JSON</Button><Button onClick={runReview} disabled={reviewing||contract.trim().length<20}><Sparkles/> {reviewing?"Reviewing…":"Run AI review"}</Button></div>}/>
     <div className="review-source-picker"><label><span>Saved reviews</span><select aria-label="Saved reviews" value={reviewProjectId||""} onChange={e=>{if(e.target.value)void openReview(e.target.value)}}><option value="">New review</option>{history.map(h=><option key={h.id} value={h.id}>{documents.find(d=>d.id===h.document_id)?.title||"Contract review"} · {new Date(h.created_at).toLocaleDateString()}</option>)}</select></label><label><span>Source document</span><select value={selectedDocument} onChange={event=>void loadDocument(event.target.value)}><option value="">Paste contract text</option>{documents.map(doc=><option value={doc.id} key={doc.id}>{doc.title} · {doc.status}</option>)}</select></label>{selectedDocument?<ToneBadge tone={contract?"green":"amber"}>{contract?"Source loaded":"Processing required"}</ToneBadge>:<ToneBadge>Private pasted source</ToneBadge>}</div>
     <div className="review-summary">{[["Document",loadedTitle],["Playbook","Core legal review"],["Findings",String(findings.length)],["Saved",reviewProjectId?"Yes":"Not yet"]].map(x=><div key={x[0]}><span>{x[0]}</span><b>{x[1]}</b></div>)}</div>
+    {reviewError && <div className="inline-error" role="alert">{reviewError}</div>}
     <Textarea value={contract} onChange={event=>{setContract(event.target.value);if(selectedDocument){setSelectedDocument("");setLoadedTitle("Pasted agreement text")}resetResults()}} placeholder="Paste the agreement text, or select a processed vault document above..." aria-label="Contract text for review"/>
     <div className="findings">{findings.length?findings.map((finding,index)=><article key={`${finding.title}-${index}`}><i className={finding.risk}/><span><ToneBadge tone={finding.risk==="high"?"red":finding.risk==="low"?"green":finding.risk==="info"?"blue":"amber"}>{finding.risk[0].toUpperCase()+finding.risk.slice(1)}</ToneBadge><h3>{finding.title}</h3><p>{finding.whyItMatters}</p>{finding.originalText?<blockquote>{finding.originalText}</blockquote>:null}{finding.suggestedText?<div className="suggested-text"><small>Suggested lawyer-review wording</small><p>{finding.suggestedText}</p></div>:null}<small>{finding.clauseRef||"Contract text"} · {finding.status||"open"}</small>{finding.id&&<div className="row"><Button variant="outline" size="sm" onClick={()=>void decide(finding,"accepted")}>Accept finding</Button><Button variant="ghost" size="sm" onClick={()=>void decide(finding,"dismissed")}>Dismiss</Button><Button variant="ghost" size="sm" onClick={()=>void decide(finding,"open")}>Reopen</Button></div>}</span></article>):<div className="empty-live"><ClipboardCheck/><h2>No findings yet</h2><p>Select a processed private document or paste agreement text, then run the review.</p></div>}</div>
   </div>;
