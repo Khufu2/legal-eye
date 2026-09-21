@@ -77,30 +77,62 @@ type HomeProps = { identity: Identity | null; go: (question: string) => void; na
 export function ResearchHome({ identity, go, navigate, openSession, jurisdictions, setJurisdictions, privateContext, setPrivateContext }: HomeProps) {
   const [question, setQuestion] = useState(""), [filters, setFilters] = useState(false), [recent, setRecent] = useState<Session[]>([]);
   useEffect(() => { if (!identity) return setRecent([]); void workspace<Session[]>(identity, `research_sessions?select=id,title,updated_at&organization_id=eq.${identity.organization_id}&order=updated_at.desc&limit=6`).then(setRecent).catch(() => undefined); }, [identity]);
-  return <div className="cathedral-home"><section className="home-hero"><h1>Ask what matters.</h1><p>Research law. Verify sources. Move to action.</p><form className="home-composer" onSubmit={e => { e.preventDefault(); go(question); }}><label htmlFor="legal-question">Ask a legal question</label><textarea id="legal-question" placeholder="Ask the law…" value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(question); } }}/><div className="composer-controls"><button type="button" aria-label="Upload private documents in Vault" title="Upload documents in Vault" onClick={() => navigate("vault")}><Plus/></button><button type="button" onClick={() => setFilters(!filters)}><BookOpen size={16}/> {jurisdictions.length === 1 ? JURISDICTIONS.find(j => j[0] === jurisdictions[0])?.[1] : `${jurisdictions.length} jurisdictions`}<ChevronDown size={13}/></button><button type="button" className={privateContext ? "context-active" : ""} onClick={() => setPrivateContext(!privateContext)}><ShieldCheck size={15}/>{privateContext ? "Firm + law" : "Public law"}</button><span className="composer-spacer"/><button type="button" onClick={() => setFilters(!filters)} aria-expanded={filters}><SlidersHorizontal size={16}/><span className="filter-label">Filter</span></button><Button type="submit" aria-label="Ask LOCKE" disabled={question.trim().length < 3}><ArrowUp/></Button></div>{filters && <div className="jurisdiction-picker"><span>Research jurisdictions</span>{JURISDICTIONS.map(([code, name]) => <label key={code}><input type="checkbox" checked={jurisdictions.includes(code)} onChange={e => setJurisdictions(e.target.checked ? [...jurisdictions, code] : jurisdictions.filter(j => j !== code).length ? jurisdictions.filter(j => j !== code) : [code])}/>{name}</label>)}<p>Coverage varies by source. Answers identify gaps in the retrieved evidence.</p></div>}</form><div className="question-examples">{["Unfair termination in Tanzania", "Directors’ duties: TZ vs UK", "Review a confidentiality clause"].map(q => <button key={q} onClick={() => setQuestion(q)}>{q}</button>)}</div></section>
-    <section className="home-work"><div className="home-section-heading"><div><h2>Your legal workspace</h2><p>Research, review, draft and automate.</p></div><button onClick={() => navigate("matters")}>Open matters <ArrowUpRight size={15}/></button></div><div className="work-shortcuts">{[["review", "Review an agreement", "Find risks. Improve wording.", FileText], ["draft", "Prepare a document", "Draft and refine.", BookOpen], ["tables", "Compare documents", "Compare with evidence.", Search], ["workflows", "Build a workflow", "Connect steps and approvals.", Check]].map(([view, title, copy, Icon]) => { const I = Icon as typeof Search; return <button key={String(view)} onClick={() => navigate(String(view))}><I size={20}/><h3>{String(title)}</h3><p>{String(copy)}</p><ArrowUpRight size={16}/></button>; })}</div><div className="home-section-heading recent-heading"><h2>Continue working</h2><span>{recent.length ? "Recent research" : "Your work, in one place"}</span></div>{recent.length ? <div className="recent-research">{recent.map(r => <button key={r.id} onClick={() => openSession(r.id)}><MessageSquareText size={18}/><b>{r.title}</b><time>{new Date(r.updated_at).toLocaleDateString()}</time><ArrowUpRight size={16}/></button>)}</div> : <p className="home-empty">{identity ? "Start your first question. Research and its evidence are saved here automatically." : "Sign in to save research, organise matters, and work with private documents."}</p>}</section>
-    <section className="home-guide" aria-label="How to use LOCKE"><div className="home-upload-note"><FileText/><span><b>Using private documents?</b> Upload them in <button onClick={()=>navigate("vault")}>Vault</button>, wait for <strong>Ready</strong>, then use Review, Tables, Skills or Agent.</span></div>
-      <div className="home-guide-title"><span>From authority to action</span></div>
+  const scrollToCapabilities = () => document.getElementById("locke-capabilities")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  return <div className="cathedral-home">
+    <section className="home-hero">
+      <div className="home-hero-core">
+        <div className="home-hero-brand"><LockeMark/><span>LOCKE</span></div>
+        <h1>Legal research starts here</h1>
+        <form className="home-composer" onSubmit={e => { e.preventDefault(); go(question); }}>
+          <label className="sr-only" htmlFor="legal-question">Ask a legal question</label>
+          <textarea id="legal-question" placeholder="Ask a legal question…" value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(question); } }}/>
+          <div className="composer-controls">
+            <button type="button" aria-label="Upload private documents in Vault" title="Upload documents in Vault" onClick={() => navigate("vault")}><Plus/></button>
+            <button type="button" onClick={() => setFilters(!filters)}><BookOpen size={16}/> {jurisdictions.length === 1 ? JURISDICTIONS.find(j => j[0] === jurisdictions[0])?.[1] : `${jurisdictions.length} jurisdictions`}<ChevronDown size={13}/></button>
+            <button type="button" className={privateContext ? "context-active" : ""} onClick={() => setPrivateContext(!privateContext)}><ShieldCheck size={15}/>{privateContext ? "Firm + law" : "Public law"}</button>
+            <span className="composer-spacer"/>
+            <button type="button" onClick={() => setFilters(!filters)} aria-expanded={filters}><SlidersHorizontal size={16}/><span className="filter-label">Filter</span></button>
+            <Button type="submit" aria-label="Ask LOCKE" disabled={question.trim().length < 3}><ArrowUp/></Button>
+          </div>
+          {filters && <div className="jurisdiction-picker"><span>Research jurisdictions</span>{JURISDICTIONS.map(([code, name]) => <label key={code}><input type="checkbox" checked={jurisdictions.includes(code)} onChange={e => setJurisdictions(e.target.checked ? [...jurisdictions, code] : jurisdictions.filter(j => j !== code).length ? jurisdictions.filter(j => j !== code) : [code])}/>{name}</label>)}<p>Coverage varies by source. Answers identify gaps in the retrieved evidence.</p></div>}
+        </form>
+        <div className="question-examples">{["Find controlling Tanzanian authority", "Compare directors’ duties: TZ vs UK", "Review a confidentiality clause"].map(q => <button key={q} onClick={() => setQuestion(q)}>{q}</button>)}</div>
+      </div>
+      <button className="home-scroll-cue" type="button" onClick={scrollToCapabilities} aria-label="Explore LOCKE capabilities">
+        <span/>
+        <b>Built for legal work</b>
+        <ChevronDown size={15}/>
+        <span/>
+      </button>
+    </section>
+
+    <section id="locke-capabilities" className="home-guide" aria-label="How to use LOCKE">
+      <div className="home-guide-title"><span>From authority to work product</span></div>
       <article className="home-feature">
-        <div className="home-feature-copy"><Search/><div><h3>Research with source evidence</h3><p>Ask a legal question, choose the jurisdictions that matter, then inspect the exact passages behind the answer. Public authority and private firm material stay visibly distinct.</p></div></div>
+        <div className="home-feature-copy"><Search/><div><h3>Research with source evidence</h3><p>Ask a legal question, choose the jurisdictions that matter, and inspect the exact passages behind the answer.</p></div></div>
         <div className="home-feature-actions">{["What makes an employment termination unfair in Tanzania?","Compare directors’ duties in Tanzania and the UK.","What remedies follow from an unfair termination?"].map(q=><button key={q} onClick={()=>{setQuestion(q);window.scrollTo({top:0,behavior:"smooth"})}}>{q}<ArrowUpRight size={15}/></button>)}</div>
       </article>
       <article className="home-feature">
-        <div className="home-feature-copy"><FileText/><div><h3>Review agreements against the text</h3><p>Load a processed firm document or paste an agreement, identify text-supported risks, keep the source wording visible, and save lawyer-reviewed findings.</p></div></div>
-        <div className="home-feature-actions"><button onClick={()=>navigate("review")}>Open contract review <ArrowUpRight size={15}/></button><button onClick={()=>navigate("vault")}>Open private knowledge <ArrowUpRight size={15}/></button></div>
+        <div className="home-feature-copy"><FileText/><div><h3>Work with private documents</h3><p>Upload firm documents in Vault, wait until they are Ready, then use them in Review, Tables, Skills or Agent.</p></div></div>
+        <div className="home-feature-actions"><button onClick={()=>navigate("vault")}>Upload or open private documents <ArrowUpRight size={15}/></button><button onClick={()=>navigate("review")}>Review an agreement <ArrowUpRight size={15}/></button></div>
       </article>
       <article className="home-feature">
-        <div className="home-feature-copy"><BookOpen/><div><h3>Draft, compare and organise legal work</h3><p>Move from research into the editor, compare documents in structured tables, and keep work grouped inside matters instead of scattering it across separate tools.</p></div></div>
+        <div className="home-feature-copy"><BookOpen/><div><h3>Draft, compare and organise legal work</h3><p>Move research into the editor, compare documents in structured tables, and keep work grouped inside matters.</p></div></div>
         <div className="home-feature-actions"><button onClick={()=>navigate("draft")}>Open editor <ArrowUpRight size={15}/></button><button onClick={()=>navigate("tables")}>Compare documents <ArrowUpRight size={15}/></button><button onClick={()=>navigate("matters")}>Open matters <ArrowUpRight size={15}/></button></div>
       </article>
       <article className="home-feature">
-        <div className="home-feature-copy"><ShieldCheck/><div><h3>Use firm knowledge with explicit boundaries</h3><p>Private documents are permission-filtered before retrieval. Source evidence, organization access and lawyer checkpoints remain visible throughout the workspace.</p></div></div>
-        <div className="home-feature-actions"><button onClick={()=>navigate("trust")}>Open Trust <ArrowUpRight size={15}/></button><button onClick={()=>navigate("portal")}>Client portal <ArrowUpRight size={15}/></button></div>
+        <div className="home-feature-copy"><ShieldCheck/><div><h3>Keep firm knowledge governed</h3><p>Private documents are permission-filtered before retrieval, with source evidence and lawyer checkpoints kept visible.</p></div></div>
+        <div className="home-feature-actions"><button onClick={()=>navigate("trust")}>Open Trust <ArrowUpRight size={15}/></button><button onClick={()=>navigate("portal")}>Open client portal <ArrowUpRight size={15}/></button></div>
       </article>
       <article className="home-feature">
-        <div className="home-feature-copy"><Check/><div><h3>Automate repeatable legal work</h3><p>Turn recurring firm instructions into Skills, connect steps in Workflows, run governed Agent tasks, and monitor source changes without inventing a parallel process.</p></div></div>
+        <div className="home-feature-copy"><Check/><div><h3>Automate repeatable legal work</h3><p>Reuse firm instructions with Skills, connect steps in Workflows, run Agent tasks, and monitor source changes.</p></div></div>
         <div className="home-feature-actions"><button onClick={()=>navigate("skills")}>Skills <ArrowUpRight size={15}/></button><button onClick={()=>navigate("workflows")}>Workflows <ArrowUpRight size={15}/></button><button onClick={()=>navigate("agent")}>Agent <ArrowUpRight size={15}/></button><button onClick={()=>navigate("monitor")}>Monitor <ArrowUpRight size={15}/></button></div>
       </article>
+    </section>
+
+    <section className="home-work home-recent">
+      <div className="home-guide-title"><span>Continue working</span></div>
+      {recent.length ? <div className="recent-research">{recent.map(r => <button key={r.id} onClick={() => openSession(r.id)}><MessageSquareText size={18}/><b>{r.title}</b><time>{new Date(r.updated_at).toLocaleDateString()}</time><ArrowUpRight size={16}/></button>)}</div> : <p className="home-empty">{identity ? "Your saved research will appear here." : "Sign in to save research, organise matters, and work with private documents."}</p>}
     </section>
   </div>;
 }
