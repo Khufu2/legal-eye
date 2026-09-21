@@ -162,3 +162,252 @@ html{scrollbar-color:var(--line) transparent;scrollbar-gutter:stable}body{backgr
   .home-work{margin-top:0;padding-top:30px}
   .home-guide{margin-top:72px}
 }
+
+
+/* 2026-09-21 research-first home: measured to the supplied Consensus reference */
+@media(min-width:801px){
+  .workspace-sidebar{width:190px;padding:14px 10px 12px}
+  .workspace-stage{margin-left:190px}
+  .workspace-menu{left:202px}
+  .sidebar-brand{padding:5px 6px 13px;gap:9px}
+  .sidebar-brand>svg{width:23px;height:23px}
+  .sidebar-brand b{font-size:15px}
+  .sidebar-brand small{font-size:9px;margin-top:2px}
+  .sidebar-new{
+    min-height:35px;
+    margin:2px 0 12px;
+    padding:0 7px;
+    border:0;
+    border-radius:7px;
+    background:transparent;
+    font-size:12px;
+  }
+  .sidebar-new:hover{background:var(--hover)}
+  .sidebar-new>svg{
+    width:22px;height:22px;padding:5px;border-radius:50%;
+    background:var(--blue);color:#fff;
+  }
+  .sidebar-service-group{margin-bottom:12px;gap:1px}
+  .sidebar-service-group>small,.sidebar-integrations>small{
+    padding:0 7px 5px;font-size:9px;letter-spacing:.06em
+  }
+  .sidebar-service-group>button{
+    min-height:31px;padding:5px 7px;border-radius:6px;font-size:11.5px;gap:9px
+  }
+  .sidebar-service-group>button svg{width:15px}
+  .sidebar-integrations{padding-top:8px}
+  .sidebar-integrations>a{min-height:31px;padding:6px 7px;font-size:11px}
+  .sidebar-account{margin-top:8px;padding:9px 7px;grid-template-columns:28px minmax(0,1fr)}
+  .sidebar-avatar{width:27px;height:27px;font-size:10px}
+  .sidebar-account b{font-size:11px}.sidebar-account small{font-size:9px}
+
+  .view-ask .workspace-header{display:none}
+  .view-ask .workspace-main{min-height:100dvh}
+  .view-ask .cathedral-home{max-width:none;padding:0}
+}
+
+/* First viewport */
+.view-ask .home-hero{
+  position:relative;
+  min-height:100dvh;
+  padding:0;
+  display:block;
+  text-align:center;
+}
+.home-hero-core{
+  width:min(700px,calc(100vw - 250px));
+  margin:0 auto;
+  padding-top:clamp(168px,25.5vh,228px);
+}
+.home-hero-brand{
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  margin:0 0 8px;color:var(--foreground);
+  font-size:20px;font-weight:650;letter-spacing:-.025em;
+}
+.home-hero-brand svg{width:27px;height:27px;color:var(--blue)}
+.view-ask .home-hero h1{
+  margin:0 0 25px;
+  font:650 27px/1.15 var(--font-sans);
+  letter-spacing:-.035em;
+}
+.view-ask .home-hero>p{display:none}
+
+.view-ask .home-composer{
+  width:700px;
+  max-width:100%;
+  min-height:104px;
+  margin:0 auto;
+  padding:14px 13px 9px;
+  border:1px solid #50525a;
+  border-radius:15px;
+  background:#303136;
+  box-shadow:none;
+}
+.view-ask .home-composer textarea{
+  width:100%;
+  min-height:39px;
+  max-height:150px;
+  padding:0 2px;
+  font:400 15px/22px var(--font-sans);
+  color:var(--foreground);
+}
+.view-ask .home-composer textarea::placeholder{color:#92949c}
+.view-ask .composer-controls{margin-top:5px;gap:7px}
+.view-ask .composer-controls>button{
+  min-height:34px;height:34px;
+  padding:0 10px;
+  border:1px solid #50525a;
+  border-radius:9px;
+  background:transparent;
+  color:#d3d5da;
+  font-size:11.5px;
+}
+.view-ask .composer-controls>button:first-child{width:34px;padding:0}
+.view-ask .composer-controls>button:first-child svg{width:18px}
+.view-ask .composer-controls>button:last-child{
+  width:35px;padding:0;background:var(--primary);border-color:transparent;color:#fff
+}
+.view-ask .composer-controls .context-active{border-style:dashed}
+.view-ask .jurisdiction-picker{font-size:11px}
+.view-ask .question-examples{
+  max-width:700px;
+  margin:20px auto 0;
+  gap:7px;
+}
+.view-ask .question-examples button{
+  min-height:32px;
+  padding:7px 11px;
+  border:0;
+  border-radius:8px;
+  background:#3a3b42;
+  color:#b6b8c0;
+  font-size:10.5px;
+}
+.view-ask .question-examples button:hover{background:#42434b;color:#fff}
+
+.home-scroll-cue{
+  position:absolute;
+  left:50%;bottom:24px;
+  transform:translateX(-50%);
+  width:min(700px,calc(100% - 56px));
+  display:grid;
+  grid-template-columns:1fr auto auto 1fr;
+  align-items:center;
+  gap:12px;
+  color:var(--foreground);
+  font-size:13px;
+  font-weight:650;
+}
+.home-scroll-cue>span{height:1px;background:var(--line)}
+.home-scroll-cue>svg{color:var(--quiet);animation:locke-cue 1.8s ease-in-out infinite}
+@keyframes locke-cue{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+
+/* Below the fold: same narrow editorial column and neutral surfaces */
+.view-ask .home-guide,
+.view-ask .home-work{
+  width:min(768px,calc(100% - 48px));
+  max-width:none;
+  margin:0 auto;
+}
+.view-ask .home-guide{
+  padding-top:74px;
+}
+.view-ask .home-guide-title{
+  grid-template-columns:1fr auto 1fr;
+  gap:22px;
+  margin:0 0 23px;
+  font-size:14px;
+}
+.view-ask .home-feature{
+  padding:43px 0 47px;
+  border-top:1px solid var(--line);
+}
+.view-ask .home-feature:first-of-type{border-top:0}
+.view-ask .home-feature-copy{
+  grid-template-columns:20px 1fr;
+  gap:11px;
+}
+.view-ask .home-feature-copy>svg{
+  width:16px;height:16px;margin-top:2px;color:#e5e5e5;
+}
+.view-ask .home-feature h3{
+  margin:0 0 7px;
+  font-size:14px;
+  font-weight:700;
+  letter-spacing:-.01em;
+}
+.view-ask .home-feature p{
+  margin:0;
+  max-width:720px;
+  color:#f1f1ef;
+  font-size:13px;
+  line-height:1.55;
+}
+.view-ask .home-feature-actions{
+  display:grid;
+  gap:7px;
+  margin-top:19px;
+}
+.view-ask .home-feature-actions button{
+  min-height:42px;
+  padding:8px 12px;
+  border:1px solid #555760;
+  border-radius:8px;
+  background:#414249;
+  color:#fff;
+  font-size:12px;
+}
+.view-ask .home-feature-actions button:hover{background:#494a52;border-color:#60626b}
+.view-ask .home-feature-actions button svg{color:#aeb1ba}
+
+.view-ask .home-recent{
+  padding:65px 0 80px;
+}
+.view-ask .recent-research>button{
+  padding:17px 0;
+  font-size:13px;
+}
+.view-ask .recent-research time{font-size:11px}
+.view-ask .home-empty{padding:16px 0 50px}
+
+/* Closed assistant matches the compact floating help affordance in the reference */
+.locke-guide-fab{
+  width:36px;height:36px;min-height:36px;
+  right:18px;bottom:18px;
+  padding:0;
+  justify-content:center;
+  border:1px solid #5a5c64;
+  border-radius:50%;
+  background:#37383e;
+  color:#fff;
+  box-shadow:none;
+}
+.locke-guide-fab>span:last-child{display:none}
+.locke-guide-mark{
+  width:34px;height:34px;
+  border-radius:50%;
+  background:transparent;
+  color:var(--blue);
+}
+.locke-guide-mark svg{width:17px}
+
+/* Accessibility helper used by the research-first composer */
+.sr-only{
+  position:absolute!important;width:1px!important;height:1px!important;
+  padding:0!important;margin:-1px!important;overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;
+}
+
+@media(max-width:800px){
+  .view-ask .workspace-header{display:flex}
+  .view-ask .cathedral-home{padding:0 18px 80px}
+  .view-ask .home-hero{min-height:auto;padding:54px 0 72px}
+  .home-hero-core{width:100%;padding-top:0}
+  .home-hero-brand{font-size:18px}
+  .view-ask .home-hero h1{font-size:25px;margin-bottom:22px}
+  .view-ask .home-composer{width:100%}
+  .home-scroll-cue{display:none}
+  .view-ask .home-guide,.view-ask .home-work{width:100%}
+  .view-ask .home-guide{padding-top:36px}
+  .locke-guide-fab{bottom:82px}
+}
