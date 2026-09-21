@@ -148,7 +148,7 @@ async function fetchSparql(query:string){
     method:"POST",signal:AbortSignal.timeout(30000),headers:{
       accept:"application/sparql-results+json",
       "content-type":"application/x-www-form-urlencoded;charset=UTF-8",
-      "user-agent":"LegalEye/0.1 (governed EUR-Lex metadata connector; contact=truckai.co@gmail.com)",
+      "user-agent":"LOCKE/0.2 governed EUR-Lex metadata connector",
     },
     body:new URLSearchParams({query,format:"application/sparql-results+json"}),
   });
@@ -164,7 +164,8 @@ function bindingValue(binding:any,key:string){
 async function ingestEurLex(source:any,runId:string,limit:number){
   const query=`PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
 SELECT DISTINCT ?work ?celex ?date ?title ?resourceType WHERE {
-  ?work cdm:work_id_document ?celex ; cdm:work_date_document ?date .
+  ?work cdm:resource_legal_id_celex ?celex ;
+        cdm:work_date_document ?date .
   OPTIONAL { ?work cdm:work_has_resource-type ?resourceType . }
   OPTIONAL {
     ?expression cdm:expression_belongs_to_work ?work ;
