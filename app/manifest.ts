@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Legal Eye — Legal Intelligence",
-    short_name: "Legal Eye",
-    description: "Legal research, drafting, review, workflows and secure client collaboration.",
+    name: "LOCKE — Legal intelligence.",
+    short_name: "LOCKE",
+    description: "Legal research, drafting, review, comparison, workflows and secure firm knowledge.",
     start_url: "/",
     display: "standalone",
     background_color: "#242426",
