@@ -91,7 +91,10 @@ export function buildSearchQueries(question: string) {
 export async function retrieveEvidence(options: {url:string;key:string;authorization:string;query:string;jurisdictions:string[];organizationId:string;matterId?:string|null;privateContext?:boolean}) {
   const rpc = async (name:string,body:unknown) => {
     const result=await fetch(`${options.url}/rest/v1/rpc/${name}`,{method:'POST',headers:{apikey:options.key,authorization:options.authorization,'content-type':'application/json'},body:JSON.stringify(body),cache:'no-store'});
-    if(!result.ok) throw new Error(`${name === "search_legal_evidence" ? "Public" : "Private"} source search failed (${result.status}). Please retry.`);
+    if(!result.ok) {
+      const scope = name === "search_legal_evidence" ? "Public legal" : "Private firm";
+      throw new Error(`${scope} source search is temporarily unavailable (${result.status}). No legal conclusion was generated. Please retry.`);
+    }
     return result.json();
   };
 
