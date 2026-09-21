@@ -178,17 +178,16 @@ def persist_document(api: Api, source: dict[str, Any], *, external_id: str, cano
         "headers": {}, "provenance": {"retrieved_by": "open-corpus-worker", **metadata}, "processing_state": "indexed",
     }], return_representation=True)
     source_object_id = source_rows[0]["id"] if source_rows else None
-    api.delete("legal_document_chunks", f"legal_document_id=eq.{enc(document_id)}")
-    batch: list[dict[str, Any]] = []
+    chunk_rows: list[dict[str, Any]] = []
     for index, piece in enumerate(pieces):
-        batch.append({"legal_document_id": document_id, "source_node_ref": f"#/texts/{index}", "node_type": "text",
-                      "reading_order": index, "content": piece, "token_count": max(1, len(piece) // 4), "language_code": "en",
-                      "extraction_confidence": 0.97, "metadata": {"source_object_id": source_object_id, "parser": "open-corpus-worker"}})
-        if len(batch) == 100:
-            api.request("POST", "legal_document_chunks", json_body=batch, prefer="return=minimal")
-            batch = []
-    if batch:
-        api.request("POST", "legal_document_chunks", json_body=batch, prefer="return=minimal")
+        chunk_rows.append({"source_node_ref": f"#/texts/{index}", "node_type": "text",
+                           "reading_order": index, "content": piece, "token_count": max(1, len(piece) // 4),
+                           "language_code": "en", "extraction_confidence": 0.97,
+                           "metadata": {"source_object_id": source_object_id, "parser": "open-corpus-worker"}})
+    replaced = api.request("POST", "rpc/replace_open_corpus_chunks",
+                           json_body={"p_document_id": document_id, "p_chunks": chunk_rows})
+    if int(replaced or 0) != len(chunk_rows):
+        raise RuntimeError(f"Chunk replacement count mismatch for {document_id}: {replaced} != {len(chunk_rows)}")
     try:
         api.upsert("authorities", "canonical_key", [{"legal_document_id": document_id, "canonical_key": f"legal-document:{document_id}",
             "name": title[:500], "authority_type": "legislation", "jurisdiction_code": jurisdiction, "strength": "binding",
