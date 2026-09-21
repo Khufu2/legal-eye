@@ -79,3 +79,86 @@ html{scrollbar-color:var(--line) transparent;scrollbar-gutter:stable}body{backgr
 .locke-guide-panel>form{display:grid;grid-template-columns:1fr 38px;gap:8px;align-items:end;padding:12px;border-top:1px solid #dfe8e5;background:#fff}.locke-guide-panel textarea{resize:none;max-height:100px;min-height:42px;padding:10px 11px;border:1px solid #dce5e2;border-radius:11px;background:#f8faf9;color:#18201e;font:12px/1.45 var(--font-sans);outline:0}.locke-guide-panel textarea:focus{border-color:#63c8b8}.locke-guide-panel>form button{display:grid;width:38px;height:38px;place-items:center;border-radius:10px;background:linear-gradient(135deg,var(--locke-teal),var(--locke-blue));color:#fff}.locke-guide-panel>form button:disabled{opacity:.4}
 
 @media(max-width:800px){.locke-guide-fab{right:14px;bottom:82px}.locke-guide-panel{right:10px;bottom:78px;height:calc(100dvh - 95px)}.skills-grid{grid-template-columns:1fr}.skill-list{max-height:180px;overflow:auto}.skill-head{flex-direction:column;gap:14px}.agent-grid{grid-template-columns:1fr}}
+
+
+/* 2026-09-21 surgical spacing + accent correction */
+:root{--locke-teal:#4b9fe8;--locke-blue:#4b9fe8;--ring:#6bb6ef}
+:root[data-theme=light]{--locke-teal:#267dbe;--locke-blue:#267dbe;--ring:#3e94ce}
+
+/* Match the reference rhythm: the Ask experience owns the first viewport. */
+.home-hero{
+  min-height:calc(100dvh - 92px);
+  padding:112px 0 72px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+}
+.home-work{
+  margin-top:18px;
+  padding-top:42px;
+}
+.home-guide{
+  margin-top:118px;
+  padding-top:10px;
+}
+.home-guide-title{margin-bottom:26px}
+.home-feature{padding:42px 0 48px}
+.home-feature-copy{gap:13px}
+.home-feature h3{margin-bottom:10px}
+.home-feature-actions{margin-top:24px}
+
+/* Below-the-fold explanations stay neutral; blue is reserved for interaction. */
+.home-upload-note{
+  margin-bottom:34px;
+  border-color:var(--line);
+  background:transparent;
+  color:var(--quiet);
+}
+.home-upload-note>svg{color:var(--quiet)}
+.home-upload-note button{color:var(--blue)}
+.home-feature-copy>svg{color:var(--quiet)}
+.home-feature-actions button{
+  background:var(--composer);
+  border-color:var(--line);
+}
+.home-feature-actions button:hover{
+  border-color:color-mix(in srgb,var(--blue) 38%,var(--line));
+}
+.home-feature-actions button svg{color:var(--quiet)}
+
+/* Use blue, not teal/green, for product accents. */
+.sidebar-brand>svg,.workspace-brand-mobile>svg{color:var(--blue)}
+.sidebar-avatar{border-color:#4b9fe84a;color:var(--blue)}
+.sidebar-service-group>button[aria-current=page]{box-shadow:inset 2px 0 var(--blue)}
+.sidebar-new{border-color:#4b9fe833}
+.sidebar-new>svg,.workspace-header-actions>button:first-child{color:var(--blue)}
+.workspace-tip{
+  border-color:var(--line);
+  background:transparent;
+}
+.workspace-tip svg{color:var(--quiet)}
+.workspace-tip a,.inline-vault-link{color:var(--blue)}
+.skill-list button.active{box-shadow:inset 2px 0 var(--blue)!important}
+.skill-list i{background:#4b9fe812!important;border-color:#4b9fe82e!important;color:var(--blue)!important}
+.live-source-picker label:has([data-state=checked]){border-color:#4b9fe855;background:#4b9fe80d}
+.timeline>div.done>i{border-color:#4b9fe84f;background:#4b9fe816;color:var(--blue)}
+.run-head>i{background:var(--blue)}
+
+/* Assistant uses the same single blue accent. */
+.locke-guide-mark,
+.locke-guide-logo>span,
+.locke-guide-panel>form button{background:var(--blue)}
+.guide-orb{background:#4b9fe818;color:var(--blue)}
+.locke-guide-context span{background:#e9f2f8;color:#45657a}
+.locke-guide-starters button:hover{border-color:#4b9fe86b}
+.locke-guide-upload{color:var(--blue)}
+.locke-guide-panel textarea:focus{border-color:#4b9fe8}
+.locke-guide-message.user p{background:#edf5fb;border-color:#d3e5f2}
+.locke-guide-thinking i{background:var(--blue)}
+
+@media(max-width:800px){
+  .home-hero{min-height:auto;padding:56px 0 44px}
+  .home-work{margin-top:0;padding-top:30px}
+  .home-guide{margin-top:72px}
+}
