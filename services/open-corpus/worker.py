@@ -342,6 +342,76 @@ def process_uk(api: Api, source: dict[str, Any], limit: int) -> int:
 
 
 
+def process_new_zealand(api: Api, source: dict[str, Any], limit: int) -> int:
+    key = os.environ.get("NZ_LEGISLATION_API_KEY", "").strip()
+    if not key:
+        raise RuntimeError("NZ_LEGISLATION_API_KEY is required")
+    cursor = get_cursor(api, source["id"])
+    page = int(cursor.get("page", 1))
+    page_size = max(1, min(limit, 100))
+    response = api.client.get(
+        "https://api.legislation.govt.nz/v0/works/",
+        params={
+            "page": str(page),
+            "per_page": str(page_size),
+            "sort_by": "most_recently_updated",
+            "publisher": "Parliamentary Counsel Office",
+        },
+        headers={"X-Api-Key": key, "accept": "application/json", "user-agent": USER_AGENT},
+    )
+    response.raise_for_status()
+    payload = response.json()
+    entries = payload.get("results", [])
+    if not isinstance(entries, list):
+        raise RuntimeError("New Zealand Legislation API returned an unexpected payload")
+
+    completed = 0
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        work_id = str(item.get("work_id") or "").strip()
+        version = item.get("latest_matching_version") or {}
+        version_id = str(version.get("version_id") or "").strip()
+        title = str(version.get("title") or work_id or "New Zealand legislation").strip()
+        formats = version.get("formats") or []
+        xml_url = next((str(x.get("url")) for x in formats if isinstance(x, dict) and str(x.get("type") or "").lower() == "xml" and x.get("url")), "")
+        if not work_id or not version_id or not xml_url:
+            continue
+        document = api.client.get(xml_url, headers={"accept": "application/xml", "user-agent": USER_AGENT}, follow_redirects=True)
+        if document.status_code >= 400:
+            LOGGER.warning("New Zealand XML unavailable", extra={"work_id": work_id, "status": document.status_code})
+            continue
+        legislation_type = str(item.get("legislation_type") or "legislation").lower().replace("-", "_")
+        persist_document(
+            api,
+            source,
+            external_id=f"nz:{version_id}",
+            canonical_url=xml_url.removesuffix(".xml/").removesuffix(".xml"),
+            jurisdiction="NZ",
+            document_type=legislation_type,
+            title=title,
+            citation=None,
+            published_at=None,
+            raw=document.text,
+            media_type="application/xml",
+            metadata={
+                "work_id": work_id,
+                "version_id": version_id,
+                "legislation_status": item.get("legislation_status"),
+                "publisher": "Parliamentary Counsel Office",
+                "version_label": version_id,
+            },
+        )
+        completed += 1
+
+    total = int(payload.get("total") or 0)
+    per_page = int(payload.get("per_page") or page_size)
+    next_page = page + 1
+    complete = not entries or (total > 0 and page * per_page >= total)
+    set_cursor(api, source["id"], {"page": next_page, "per_page": per_page, "total": total, "complete": complete})
+    return completed
+
+
 def process_eurlex(api: Api, source: dict[str, Any], limit: int) -> int:
     cursor = get_cursor(api, source["id"])
     offset = int(cursor.get("offset", 0))
@@ -465,7 +535,7 @@ def run(limit: int) -> int:
     api = Api(base_url, secret)
     processed = 0
     try:
-        sources = [("canada_justice_xml", process_canada), ("australia_register", process_australia), ("uk_legislation", process_uk), ("eurlex", process_eurlex)]
+        sources = [("canada_justice_xml", process_canada), ("australia_register", process_australia), ("uk_legislation", process_uk), ("eurlex", process_eurlex), ("nz_legislation", process_new_zealand)]
         each = max(1, limit // len(sources))
         for adapter, handler in sources:
             source = source_policy(api, adapter)
