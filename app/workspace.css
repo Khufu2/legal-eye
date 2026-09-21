@@ -520,3 +520,16 @@ html{scrollbar-color:var(--line) transparent;scrollbar-gutter:stable}body{backgr
   .section-header p,.live-header p{font-size:14px!important}
   .intelligence-guide-steps{grid-template-columns:1fr}
 }
+
+
+/* Agent evidence: make the generated work auditable at handoff. */
+.agent-used-documents{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}
+.agent-used-documents>.eyebrow{width:100%}
+.agent-used-documents>span:not(.eyebrow){display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--background);font-size:12.5px;color:var(--quiet)}
+.agent-used-documents svg{width:14px;height:14px;color:var(--blue)}
+.agent-evidence{display:grid;gap:9px;margin:21px 0;padding-top:18px;border-top:1px solid var(--line)}
+.agent-evidence>article{padding:13px 14px;border:1px solid var(--line);border-radius:9px;background:var(--background)}
+.agent-evidence article>b{display:block;font-size:13.5px;line-height:1.4}
+.agent-evidence article>small{display:block;margin-top:4px;color:var(--quiet);font-size:11.5px}
+.agent-evidence blockquote{margin:10px 0 0;padding:10px 12px;border-left:2px solid var(--blue);background:var(--muted);font-size:12.5px;line-height:1.55;color:var(--quiet)}
+.agent-evidence a{display:inline-block;margin-top:9px;color:var(--blue);font-size:12px;font-weight:600}
