@@ -533,3 +533,221 @@ html{scrollbar-color:var(--line) transparent;scrollbar-gutter:stable}body{backgr
 .agent-evidence article>small{display:block;margin-top:4px;color:var(--quiet);font-size:11.5px}
 .agent-evidence blockquote{margin:10px 0 0;padding:10px 12px;border-left:2px solid var(--blue);background:var(--muted);font-size:12.5px;line-height:1.55;color:var(--quiet)}
 .agent-evidence a{display:inline-block;margin-top:9px;color:var(--blue);font-size:12px;font-weight:600}
+
+
+/* 2026-09-22 lawyer handoff readability + dark surface hardening */
+@media(min-width:801px){
+  /* Consensus-density navigation, but readable at normal laptop scaling. */
+  .workspace-sidebar{width:206px}
+  .workspace-stage{margin-left:206px}
+  .workspace-menu{left:218px}
+  .sidebar-brand b{font-size:16px}
+  .sidebar-brand small{font-size:10px}
+  .sidebar-new{font-size:13px;min-height:38px}
+  .sidebar-service-group>small,.sidebar-integrations>small{font-size:10px}
+  .sidebar-service-group>button{min-height:34px;font-size:13px}
+  .sidebar-service-group>button svg{width:16px;height:16px}
+  .sidebar-integrations>a{font-size:12.5px;min-height:34px}
+  .sidebar-account b{font-size:12.5px}.sidebar-account small{font-size:10px}
+  .home-hero-core{width:min(700px,calc(100vw - 270px))}
+}
+
+/* Primary work surfaces must read like a professional desktop application. */
+.view-pad,.editor-live{font-size:15px}
+.section-header,.live-header{margin-bottom:34px}
+.section-header h1,.live-header h1{
+  font-size:38px!important;
+  line-height:1.12!important;
+  font-weight:600!important;
+  letter-spacing:-.045em!important;
+}
+.section-header p,.live-header p{
+  margin-top:9px!important;
+  font-size:16px!important;
+  line-height:1.55!important;
+  color:var(--quiet)!important;
+}
+.view-pad input,.view-pad textarea,.view-pad select,
+.editor-live input,.editor-live textarea,.editor-live select{
+  font-size:15px;
+}
+.view-pad [data-slot=button]{font-size:13px}
+.eyebrow{font-size:11px!important;letter-spacing:.08em}
+.helper{font-size:13px!important;line-height:1.6!important}
+
+/* Intelligence onboarding: 2x2, readable, and clearly separated from the workbench. */
+.intelligence-guide{
+  margin:0 0 30px;
+  padding:19px 20px 20px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--card);
+}
+.intelligence-guide-title{
+  display:flex;align-items:flex-start;gap:10px;
+  margin:0 0 16px;
+}
+.intelligence-guide-title>svg{
+  width:19px;height:19px;margin-top:2px;color:var(--blue)
+}
+.intelligence-guide-title>span{display:flex;flex-direction:column;gap:2px}
+.intelligence-guide-title small{
+  color:var(--blue);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase
+}
+.intelligence-guide-title b{font-size:16px;line-height:1.35}
+.intelligence-guide-steps{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+.intelligence-guide-steps>div{
+  min-height:76px;
+  padding:13px 14px!important;
+  background:var(--background)!important;
+}
+.intelligence-guide-steps i{width:27px!important;height:27px!important;font-size:12px!important}
+.intelligence-guide-steps b{font-size:14px!important}
+.intelligence-guide-steps small{font-size:12.5px!important;line-height:1.5!important}
+
+/* Explicit input/result steps on Agent, Skills, Workflows and Monitor. */
+.intelligence-input-card,.monitor-create-card{
+  padding:18px 19px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--card);
+}
+.workbench-label{
+  display:grid;
+  grid-template-columns:30px minmax(0,1fr);
+  gap:11px;
+  align-items:start;
+  margin:0 0 12px;
+}
+.workbench-label>i{
+  display:grid;width:28px;height:28px;place-items:center;
+  border:1px solid #4b9fe84b;border-radius:50%;
+  background:#4b9fe812;color:var(--blue);
+  font-size:12px;font-style:normal;font-weight:700;
+}
+.workbench-label>span{display:flex;flex-direction:column;gap:3px}
+.workbench-label b{font-size:14.5px;line-height:1.35}
+.workbench-label small{color:var(--quiet);font-size:12.5px;line-height:1.5}
+.workbench-label.compact{margin-bottom:15px}
+.workbench-label.compact>i{width:25px;height:25px;font-size:11px}
+.result-label{margin:26px 0 4px}
+.intelligence-field{display:grid;gap:5px}
+.intelligence-field>span{font-size:12px;font-weight:700;color:var(--foreground)}
+.intelligence-field>small{font-size:11.5px;color:var(--quiet);line-height:1.45}
+.skill-document-picker span em{color:var(--quiet);font-style:normal;font-weight:400;text-transform:none;letter-spacing:0}
+.monitor-create-card{margin:0 0 24px}
+.monitor-create-card .live-create-bar{align-items:end}
+.monitor-create-card .intelligence-field{flex:1;min-width:220px}
+.workflow-builder-card{margin-bottom:22px}
+.workflow-builder-card .workflow-prompt{margin:0}
+.graph-label{margin:0 0 13px}
+
+/* Dark-mode hardening: legacy prototype rules must never paint white workspaces. */
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow,
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow>aside,
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow>.settings,
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow .graph,
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow .flow,
+html[data-theme="dark"] .view-workflows .workflow-designer,
+html[data-theme="dark"] .view-workflows .workflow-prompt,
+html[data-theme="dark"] .view-workflows .workflow-builder-card{
+  background:#2a2b30!important;
+  color:#f4f3ef!important;
+  border-color:#44464e!important;
+}
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow .graph{
+  background:transparent!important;border:0!important
+}
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow>aside button{
+  color:#f4f3ef!important;
+}
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow>aside button[disabled]{
+  color:#777a83!important;
+}
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow .helper,
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow small{
+  color:#b7bac3!important;
+}
+html[data-theme="dark"] .view-workflows .workflow-canvas.live-workflow hr{border-color:#44464e!important}
+html[data-theme="dark"] .view-workflows .workflow-document{
+  color:#e9e9e7!important;
+}
+
+/* Vault: no white security panel or invisible document controls. */
+.vault-toolbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  margin-bottom:18px;
+}
+.vault-toolbar>label{
+  display:flex;align-items:center;gap:7px;
+  color:var(--quiet);font-size:12.5px;white-space:nowrap
+}
+html[data-theme="dark"] .view-vault .vault-grid,
+html[data-theme="dark"] .view-vault .vault-grid>section,
+html[data-theme="dark"] .view-vault .vault-grid>aside,
+html[data-theme="dark"] .view-vault .vault-document,
+html[data-theme="dark"] .view-vault .vault-document [data-slot=button]{
+  color:#f4f3ef!important;
+}
+html[data-theme="dark"] .view-vault .vault-grid>aside{
+  background:#2a2b30!important;
+  border:1px solid #44464e!important;
+}
+html[data-theme="dark"] .view-vault .vault-grid>aside h2,
+html[data-theme="dark"] .view-vault .vault-grid>aside b{
+  color:#f4f3ef!important
+}
+html[data-theme="dark"] .view-vault .vault-grid>aside p,
+html[data-theme="dark"] .view-vault .vault-grid>aside span{
+  color:#b7bac3!important
+}
+html[data-theme="dark"] .view-vault .vault-grid>aside>div{
+  border-color:#44464e!important
+}
+html[data-theme="dark"] .view-vault .vault-document{
+  background:#2a2b30!important;
+  border-color:#44464e!important;
+}
+html[data-theme="dark"] .view-vault .vault-document [data-slot=button]{
+  background:transparent!important;
+  border-color:#4a4c54!important;
+}
+.vault-document small strong{
+  color:var(--blue);font-weight:700;text-transform:capitalize
+}
+.vault-document.status-archived{opacity:.72}
+.destructive-link{color:#c9cbd2!important}
+.destructive-link:hover{color:#ee8e8b!important}
+
+/* Advanced work output: increase the small text that made handoff screens feel unfinished. */
+.agent-input textarea{font-size:15px!important;line-height:1.65!important}
+.agent-card h2,.agent-side h2{font-size:21px!important}
+.timeline>div b{font-size:14.5px!important}
+.timeline>div small{font-size:12.5px!important;line-height:1.6!important}
+.agent-side pre{font-size:14px!important;line-height:1.7!important}
+.live-workflow .flow b{font-size:17px!important}
+.live-workflow .flow small{font-size:13.5px!important;line-height:1.6!important}
+.live-workflow>aside:first-child button{font-size:13.5px!important}
+.live-workflow>.settings p{font-size:13.5px!important}
+.skill-list b{font-size:14.5px!important}
+.skill-list small{font-size:12.5px!important}
+.skill-head p{font-size:13px!important}
+.instructions textarea{font-size:15px!important}
+.monitor-live-grid h2{font-size:21px!important}
+.monitor-live-grid p{font-size:14.5px!important}
+.monitor-live-grid small{font-size:12.5px!important}
+.trust-live-grid table{font-size:13.5px!important}
+.trust-live-grid td{font-size:13.5px!important}
+.trust-kpis article small{font-size:12.5px!important}
+
+@media(max-width:900px){
+  .intelligence-guide-steps{grid-template-columns:1fr!important}
+  .vault-toolbar{grid-template-columns:1fr}
+}
