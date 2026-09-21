@@ -18,7 +18,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 LOGGER = logging.getLogger("legal-eye-open-corpus")
-USER_AGENT = "LegalEye/0.5 governed-open-corpus-worker"
+USER_AGENT = "LOCKE/0.6 governed-open-corpus-worker"
 
 
 def now() -> str:
