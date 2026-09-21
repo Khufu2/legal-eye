@@ -2,10 +2,10 @@
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="TaskPaneApp">
   <Id>4f70a387-7691-4a17-8df6-7f2f45103df4</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>Legal Eye</ProviderName>
+  <ProviderName>LOCKE</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Legal Eye for Word"/>
-  <Description DefaultValue="Research, draft, review and redline with firm-governed Legal Eye intelligence."/>
+  <DisplayName DefaultValue="LOCKE for Word"/>
+  <Description DefaultValue="Research, draft, review and redline with firm-governed legal intelligence."/>
   <SupportUrl DefaultValue="https://legal-eye-six.vercel.app"/>
   <AppDomains><AppDomain>https://legal-eye-six.vercel.app</AppDomain></AppDomains>
   <Hosts><Host Name="Document"/></Hosts>
