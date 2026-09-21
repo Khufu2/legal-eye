@@ -114,7 +114,7 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
     return [];
   };
 
-  const privateQuery=queries[1] || queries[0] || options.query;
+  const privateQuery=queries[0] || options.query;
   const [publicEvidence,privateEvidence]=await Promise.all([
     publicSearch(),
     options.privateContext ? rpc('search_private_text',{p_query:privateQuery,p_organization_id:options.organizationId,p_matter_id:options.matterId || null,p_limit:12}) : Promise.resolve([])
