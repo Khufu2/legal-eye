@@ -411,3 +411,112 @@ html{scrollbar-color:var(--line) transparent;scrollbar-gutter:stable}body{backgr
   .view-ask .home-guide{padding-top:36px}
   .locke-guide-fab{bottom:82px}
 }
+
+
+/* 2026-09-21 lawyer handoff readability + intelligence workspace cleanup */
+@media(min-width:801px){
+  .sidebar-service-group>button{font-size:13px;min-height:34px}
+  .sidebar-service-group>small,.sidebar-integrations>small{font-size:10px}
+  .sidebar-new{font-size:13px;min-height:37px}
+  .sidebar-integrations>a{font-size:12.5px}
+  .sidebar-account b{font-size:12px}.sidebar-account small{font-size:10px}
+}
+.view-pad{font-size:15px}
+.section-header,.live-header{margin-bottom:28px}
+.section-header h1,.live-header h1{font-size:36px!important;line-height:1.12!important;font-weight:620!important;letter-spacing:-.035em!important}
+.section-header p,.live-header p{font-size:16px!important;line-height:1.55!important;margin-top:8px!important}
+.view-pad input,.view-pad textarea,.view-pad select{font-size:15px}
+.view-pad button{font-size:13px}
+.view-pad .eyebrow{font-size:11px;letter-spacing:.08em}
+.workspace-tip{font-size:13.5px;line-height:1.6;padding:13px 15px;margin-bottom:22px}
+.workspace-tip svg{width:18px;height:18px}
+.live-create-bar input{font-size:15px}
+.live-source-picker label{font-size:14px}
+.live-source-picker>.eyebrow{font-size:11px}
+.agent-card h2,.agent-side h2,.monitor-live-grid h2{font-size:22px!important}
+.agent-side pre,.agent-result pre{font-size:15px!important;line-height:1.75!important}
+.timeline>div b{font-size:14.5px!important}.timeline>div small{font-size:13px!important;line-height:1.65!important}
+
+/* Simple four-step orientation for advanced intelligence surfaces. */
+.intelligence-guide{margin:0 0 26px;padding:17px 18px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--foreground)}
+.intelligence-guide-title{display:flex;align-items:center;gap:9px;margin-bottom:14px;font-size:14px;font-weight:700}
+.intelligence-guide-title svg{width:17px;height:17px;color:var(--blue)}
+.intelligence-guide-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.intelligence-guide-steps>div{display:grid;grid-template-columns:25px 1fr;gap:9px;align-items:start;padding:11px 10px;border:1px solid var(--line);border-radius:9px;background:var(--background)}
+.intelligence-guide-steps i{display:grid;width:24px;height:24px;place-items:center;border-radius:50%;background:#4b9fe817;color:var(--blue);font-size:11px;font-style:normal;font-weight:700}
+.intelligence-guide-steps span{display:flex;flex-direction:column;gap:4px}
+.intelligence-guide-steps b{font-size:12.5px;line-height:1.35}
+.intelligence-guide-steps small{color:var(--quiet);font-size:11.5px;line-height:1.45}
+
+/* Override legacy light-only workflow rules inherited from the old prototype. */
+.workflow-canvas.live-workflow{background:transparent!important;border:0!important;box-shadow:none!important;color:var(--foreground)!important}
+.live-workflow>aside:first-child,
+.live-workflow>.settings{
+  display:flex!important;
+  flex-direction:column;
+  padding:18px!important;
+  background:var(--card)!important;
+  color:var(--foreground)!important;
+  border:1px solid var(--line)!important;
+  border-radius:12px!important;
+}
+.live-workflow>aside:first-child{border-right:1px solid var(--line)!important}
+.live-workflow>aside:first-child button,
+.live-workflow>.settings button{
+  color:var(--foreground)!important;
+  background:transparent!important;
+  font-size:13px!important;
+}
+.live-workflow>aside:first-child button:hover,
+.live-workflow>.settings button:hover{background:var(--hover)!important}
+.live-workflow>aside:first-child button.active{background:var(--hover)!important;color:var(--foreground)!important;box-shadow:inset 2px 0 var(--blue)!important}
+.live-workflow .graph{background:none!important}
+.live-workflow .flow{background:var(--card)!important;border:1px solid var(--line)!important;color:var(--foreground)!important}
+.live-workflow .flow>i{background:#4b9fe817!important;color:var(--blue)!important}
+.workflow-prompt{background:var(--card)!important;border:1px solid var(--line)!important;color:var(--foreground)!important;box-shadow:none!important}
+.workflow-prompt>svg{color:var(--blue)!important}
+.workflow-prompt textarea{color:var(--foreground)!important}
+.workflow-document{color:var(--foreground)!important}
+.workflow-run-row,.agent-run-row{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:4px;align-items:center}
+.workflow-run-row>button:first-child,.agent-run-row>button:first-child{min-width:0}
+.icon-danger{display:grid!important;width:32px!important;height:32px!important;place-items:center!important;padding:0!important;color:var(--quiet)!important;border-radius:7px!important}
+.icon-danger:hover,.destructive-link:hover{color:var(--red)!important;background:#ee8e8b12!important}
+.icon-danger svg,.destructive-link svg{width:15px;height:15px}
+
+/* Vault must remain readable in dark mode; old prototype CSS forced white cards. */
+.vault-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start}
+.vault-grid>section,.vault-grid>aside{background:transparent!important;color:var(--foreground)!important}
+.vault-grid>aside{padding:22px!important;border:1px solid var(--line)!important;border-radius:12px!important;background:var(--card)!important}
+.vault-grid>aside h2,.vault-grid>aside b{color:var(--foreground)!important}
+.vault-grid>aside p,.vault-grid>aside span{color:var(--quiet)!important}
+.vault-grid>section .vault-document,
+.vault-grid>section button{
+  background:var(--card)!important;
+  color:var(--foreground)!important;
+  border-color:var(--line)!important;
+}
+.vault-document{padding:15px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;align-items:center}
+.vault-document>i{display:grid;width:38px;height:38px;place-items:center;border-radius:9px;background:#4b9fe817;color:var(--blue)}
+.vault-document b{font-size:14px}.vault-document small{font-size:12px;color:var(--quiet)}
+.vault-document [data-slot=button]{min-height:34px}
+
+/* Keep advanced surfaces calm and legible, not dense prototype panels. */
+.skills-grid,.agent-grid,.monitor-live-grid,.live-workflow{margin-top:20px}
+.skill-list button{font-size:14px!important}
+.skill-list b{font-size:14px!important}.skill-list small{font-size:12px!important}
+.skill-head p{font-size:13px!important}
+.instructions textarea{font-size:15px!important;line-height:1.7}
+.monitor-live-grid p{font-size:14px!important}.monitor-live-grid small{font-size:12px!important}
+.trust-kpis article b{font-size:24px}.trust-kpis article small{font-size:12px}
+
+@media(max-width:1100px){
+  .intelligence-guide-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .live-workflow{grid-template-columns:220px minmax(0,1fr)!important}
+  .live-workflow>.settings{grid-column:1/-1}
+  .vault-grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .section-header h1,.live-header h1{font-size:30px!important}
+  .section-header p,.live-header p{font-size:14px!important}
+  .intelligence-guide-steps{grid-template-columns:1fr}
+}
