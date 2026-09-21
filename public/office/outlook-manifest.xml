@@ -2,9 +2,9 @@
 <OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="MailApp">
   <Id>c5fe7628-c9b5-4b1a-b3e8-1dfb8e6d8f6d</Id>
   <Version>1.0.0.0</Version>
-  <ProviderName>Legal Eye</ProviderName>
+  <ProviderName>LOCKE</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="Legal Eye for Outlook"/>
+  <DisplayName DefaultValue="LOCKE for Outlook"/>
   <Description DefaultValue="Summarize threads, draft replies and turn email into governed legal work."/>
   <SupportUrl DefaultValue="https://legal-eye-six.vercel.app"/>
   <AppDomains><AppDomain>https://legal-eye-six.vercel.app</AppDomain></AppDomains>
