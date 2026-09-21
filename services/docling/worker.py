@@ -592,13 +592,14 @@ def process_structured_public_job(api: SupabaseApi, job: dict[str, Any], payload
     if not source_id or not external_id:
         raise PipelineError("invalid_public_job", "Structured public job lacks source identity", False)
     enforce_public_source_policy(api, source_id)
+    celex = str(payload.get("celex") or "").strip()
     work_uri = str(payload.get("work_uri") or "").strip()
-    if not work_uri:
-        raise PipelineError("eurlex_identifier_missing", "EUR-Lex job lacks a CELLAR work URI", False)
-    # CELLAR publishes canonical resource URIs over HTTP and performs controlled
-    # content-negotiation redirects. Preserve that official URI instead of forcing HTTPS.
-    separator = "&" if "?" in work_uri else "?"
-    request_uri = f"{work_uri}{separator}language=eng"
+    if not celex and not work_uri:
+        raise PipelineError("eurlex_identifier_missing", "EUR-Lex job lacks a CELEX or CELLAR identifier", False)
+    # The Publications Office REST interface accepts production-system IDs directly.
+    # Request by CELEX when available; this avoids dereferencing the RDF Work URI,
+    # which is metadata identity rather than a guaranteed publication content URL.
+    request_uri = f"http://publications.europa.eu/resource/celex/{quote(celex, safe='')}" if celex else work_uri
     raw, content_type, resolved_url = fetch_official_structured(
         request_uri,
         {"publications.europa.eu", "op.europa.eu"},
