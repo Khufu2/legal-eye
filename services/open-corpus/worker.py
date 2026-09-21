@@ -341,6 +341,96 @@ def process_uk(api: Api, source: dict[str, Any], limit: int) -> int:
     return processed
 
 
+
+def process_eurlex(api: Api, source: dict[str, Any], limit: int) -> int:
+    cursor = get_cursor(api, source["id"])
+    offset = int(cursor.get("offset", 0))
+    page_size = max(1, min(limit, 50))
+    query = f"""PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+SELECT DISTINCT ?work ?celex ?date ?title ?resourceType WHERE {{
+  ?work cdm:resource_legal_id_celex ?celex ;
+        cdm:work_date_document ?date .
+  OPTIONAL {{ ?work cdm:work_has_resource-type ?resourceType . }}
+  OPTIONAL {{
+    ?expression cdm:expression_belongs_to_work ?work ;
+      cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/ENG> ;
+      cdm:expression_title ?title .
+  }}
+  FILTER(REGEX(STR(?celex), "^[0-9][0-9A-Z]{{4,}}$"))
+}}
+ORDER BY DESC(?date) DESC(?celex)
+LIMIT {page_size}
+OFFSET {offset}"""
+    response = api.client.post(
+        "https://publications.europa.eu/webapi/rdf/sparql",
+        data={"query": query, "format": "application/sparql-results+json"},
+        headers={
+            "accept": "application/sparql-results+json",
+            "content-type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "user-agent": USER_AGENT,
+        },
+    )
+    response.raise_for_status()
+    payload = response.json()
+    entries = payload.get("results", {}).get("bindings", [])
+    if not isinstance(entries, list):
+        raise RuntimeError("EUR-Lex SPARQL returned an unexpected payload")
+
+    completed = 0
+    for binding in entries:
+        celex = str((binding.get("celex") or {}).get("value") or "").strip()
+        work_uri = str((binding.get("work") or {}).get("value") or "").strip()
+        published = str((binding.get("date") or {}).get("value") or "").strip() or None
+        title = str((binding.get("title") or {}).get("value") or "").strip() or f"EU legal document {celex}"
+        resource_type = str((binding.get("resourceType") or {}).get("value") or "").strip()
+        if not celex:
+            continue
+        canonical_url = f"https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:{quote(celex, safe='')}"
+        content_url = f"http://publications.europa.eu/resource/celex/{quote(celex, safe='')}"
+        document = api.client.get(
+            content_url,
+            headers={
+                "accept": "application/xhtml+xml, application/xml;q=0.9, text/html;q=0.8, text/xml;q=0.7",
+                "accept-language": "en",
+                "user-agent": USER_AGENT,
+            },
+            follow_redirects=True,
+        )
+        if document.status_code >= 400:
+            LOGGER.warning("EUR-Lex text unavailable", extra={"celex": celex, "status": document.status_code})
+            continue
+        raw = document.text
+        if len(strip_markup(raw)) < 120:
+            LOGGER.warning("EUR-Lex response had no usable legal text", extra={"celex": celex})
+            continue
+        type_slug = resource_type.rsplit("/", 1)[-1].lower().replace("-", "_") if resource_type else "eu_legal_act"
+        persist_document(
+            api,
+            source,
+            external_id=f"celex:{celex}",
+            canonical_url=canonical_url,
+            jurisdiction="EU",
+            document_type=type_slug,
+            title=title,
+            citation=f"CELEX {celex}",
+            published_at=published,
+            raw=raw,
+            media_type=document.headers.get("content-type", "application/xhtml+xml").split(";", 1)[0],
+            metadata={
+                "celex": celex,
+                "work_uri": work_uri,
+                "resource_type": resource_type,
+                "retrieved_via": "Publications Office CELLAR",
+                "version_label": "Official EUR-Lex English expression",
+            },
+        )
+        completed += 1
+
+    next_offset = offset + len(entries)
+    set_cursor(api, source["id"], {"offset": next_offset, "batch_size": page_size, "complete": len(entries) < page_size})
+    return completed
+
+
 def source_ready(api: Api, source: dict[str, Any]) -> bool:
     rows = api.rows("source_sync_cursors", f"select=cursor,next_attempt_at&source_id=eq.{enc(source['id'])}&limit=1")
     if not rows:
@@ -375,7 +465,7 @@ def run(limit: int) -> int:
     api = Api(base_url, secret)
     processed = 0
     try:
-        sources = [("canada_justice_xml", process_canada), ("australia_register", process_australia), ("uk_legislation", process_uk)]
+        sources = [("canada_justice_xml", process_canada), ("australia_register", process_australia), ("uk_legislation", process_uk), ("eurlex", process_eurlex)]
         each = max(1, limit // len(sources))
         for adapter, handler in sources:
             source = source_policy(api, adapter)
