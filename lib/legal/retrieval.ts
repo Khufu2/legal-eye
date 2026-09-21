@@ -80,8 +80,8 @@ export function buildSearchQueries(question: string) {
 
   const quoted = (values: string[], joiner: " " | " OR ") => values.map(term => `"${term}"`).join(joiner);
   const plans = [
-    quoted(terms.slice(0, 4), " "),
     quoted(terms.slice(0, 2), " "),
+    quoted(terms.slice(0, 2), " OR "),
     quoted(terms.slice(0, 4), " OR "),
   ].filter(Boolean);
 
