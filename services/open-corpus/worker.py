@@ -559,7 +559,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Ingest approved structured Commonwealth legal corpora")
     parser.add_argument("--limit", type=int, default=40)
     args = parser.parse_args()
-    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     total = run(max(2, min(args.limit, 100)))
     LOGGER.info("open corpus batch complete", extra={"processed": total})
 
