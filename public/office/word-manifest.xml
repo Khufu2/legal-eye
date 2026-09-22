@@ -6,9 +6,9 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="LOCKE for Word"/>
   <Description DefaultValue="Research, draft, review and redline with firm-governed legal intelligence."/>
-  <SupportUrl DefaultValue="https://legal-eye-six.vercel.app"/>
-  <AppDomains><AppDomain>https://legal-eye-six.vercel.app</AppDomain></AppDomains>
+  <SupportUrl DefaultValue="https://lockeslaw.sheenax.xyz"/>
+  <AppDomains><AppDomain>https://lockeslaw.sheenax.xyz</AppDomain></AppDomains>
   <Hosts><Host Name="Document"/></Hosts>
-  <DefaultSettings><SourceLocation DefaultValue="https://legal-eye-six.vercel.app/office/word"/></DefaultSettings>
+  <DefaultSettings><SourceLocation DefaultValue="https://lockeslaw.sheenax.xyz/office/word"/></DefaultSettings>
   <Permissions>ReadWriteDocument</Permissions>
 </OfficeApp>
