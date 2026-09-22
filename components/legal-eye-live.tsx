@@ -209,6 +209,11 @@ export function AgentLive({ identity, connect, documents }: CommonProps & { docu
   const ready = documents.filter(d => d.status === "ready");
   const load = async () => { if (!identity) return; try { const rows = await rest<AgentRun[]>(identity, `agent_runs?select=id,objective,status,plan,result,created_at&organization_id=eq.${identity.organization_id}&order=created_at.desc&limit=10`); setRuns(rows); if (!current && rows[0]) setCurrent(rows[0]); } catch (error) { toast.error(error instanceof Error ? error.message : "Agent runs could not be loaded"); } };
   useEffect(() => { void load(); }, [identity]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const documentId = new URLSearchParams(window.location.search).get("document_id");
+    if (documentId && ready.some(doc => doc.id === documentId)) setPicked([documentId]);
+  }, [documents]);
   const run = async () => { if (!identity) return connect(); setBusy(true); try { const data = await legalWork<{ plan: AgentStep[]; executive_summary: string; deliverable: string; uncertainties: string[]; evidence?: AgentEvidence[] }>(identity, { action: "run_agent", objective, document_ids: picked }); const selectedDocuments=ready.filter(d=>picked.includes(d.id)).map(d=>({id:d.id,title:d.title})); const stored = await rest<AgentRun[]>(identity, "agent_runs", { method: "POST", headers: { "content-type": "application/json", Prefer: "return=representation" }, body: JSON.stringify({ organization_id: identity.organization_id, created_by: identity.user.id, objective, plan: data.plan, status: "needs_review", result: { executive_summary: data.executive_summary, deliverable: data.deliverable, uncertainties: data.uncertainties, evidence:data.evidence||[], selected_documents:selectedDocuments }, started_at: new Date().toISOString(), completed_at: new Date().toISOString() }) }); setCurrent(stored[0]); toast.success("Agent output saved for lawyer review", { description: "The timeline records tools that actually ran." }); await load(); } catch (error) { toast.error(error instanceof Error ? error.message : "Agent run failed"); } finally { setBusy(false); } };
   const deleteRun = async (id:string) => {
     if(!identity) return;
