@@ -106,7 +106,7 @@ export async function POST(request:Request){
     const user=await getUser(authorization);if(!user)return json({error:"Authentication required"},401);
     const portal=await authorize(authorization,input.portal_id,user);if(!portal)return json({error:"Portal access denied"},403);
     const resources=await sharedResources(authorization,input.portal_id);
-    const providerOptions={gateway:{user:user.id,tags:[`feature:portal-${input.action}`,"product:legal-eye","classification:client-portal"]}};
+    const providerOptions={gateway:{user:user.id,tags:[`feature:portal-${input.action}`,"product:locke","classification:client-portal"]}};
 
     if(input.action==="ask"){
       if(!input.question)return json({error:"Question is required"},400);
@@ -119,7 +119,7 @@ export async function POST(request:Request){
       }else conversationId=await createConversation(authorization,input.portal_id,user.id,input.question);
       await appendMessage(authorization,conversationId,user.id,"user",input.question);
       const prompt=safeText(`CLIENT QUESTION:\n${input.question}\n\nPUBLISHED PORTAL MATERIAL ONLY:\n${context.map(b=>`RESOURCE ${b.resource_id} — ${b.label}\n${b.text}`).join("\n\n---\n\n")}`);
-      const generated=await generateText({model:gateway(modelName),system:"You are the client-facing Legal Eye assistant. Answer only from material explicitly published to this portal. Do not use hidden firm knowledge, unpublished workspace content, or invented authority. Every material proposition must be backed by a citation to one of the supplied resource IDs with an exact supporting quote. If the published material does not answer the question, say so clearly. This is legal work product for lawyer/client collaboration, not a substitute for final lawyer review.",prompt,output:Output.object({ schema: legalOutputSchema(answerSchema) }),providerOptions});
+      const generated=await generateText({model:gateway(modelName),system:"You are the client-facing LOCKE assistant. Answer only from material explicitly published to this portal. Do not use hidden firm knowledge, unpublished workspace content, or invented authority. Every material proposition must be backed by a citation to one of the supplied resource IDs with an exact supporting quote. If the published material does not answer the question, say so clearly. This is legal work product for lawyer/client collaboration, not a substitute for final lawyer review.",prompt,output:Output.object({ schema: legalOutputSchema(answerSchema) }),providerOptions});
       const answer=generated.output;
       await appendMessage(authorization,conversationId,null,"assistant",answer.answer,answer.citations);
       return json({...answer,conversation_id:conversationId,provider:"vercel-ai-gateway",model:modelName});
