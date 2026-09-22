@@ -6,13 +6,13 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="LOCKE for Outlook"/>
   <Description DefaultValue="Summarize threads, draft replies and turn email into governed legal work."/>
-  <SupportUrl DefaultValue="https://legal-eye-six.vercel.app"/>
-  <AppDomains><AppDomain>https://legal-eye-six.vercel.app</AppDomain></AppDomains>
+  <SupportUrl DefaultValue="https://lockeslaw.sheenax.xyz"/>
+  <AppDomains><AppDomain>https://lockeslaw.sheenax.xyz</AppDomain></AppDomains>
   <Hosts><Host Name="Mailbox"/></Hosts>
   <Requirements><Sets><Set Name="Mailbox" MinVersion="1.8"/></Sets></Requirements>
   <FormSettings>
-    <Form xsi:type="ItemRead"><DesktopSettings><SourceLocation DefaultValue="https://legal-eye-six.vercel.app/office/outlook"/><RequestedHeight>450</RequestedHeight></DesktopSettings></Form>
-    <Form xsi:type="ItemEdit"><DesktopSettings><SourceLocation DefaultValue="https://legal-eye-six.vercel.app/office/outlook"/></DesktopSettings></Form>
+    <Form xsi:type="ItemRead"><DesktopSettings><SourceLocation DefaultValue="https://lockeslaw.sheenax.xyz/office/outlook"/><RequestedHeight>450</RequestedHeight></DesktopSettings></Form>
+    <Form xsi:type="ItemEdit"><DesktopSettings><SourceLocation DefaultValue="https://lockeslaw.sheenax.xyz/office/outlook"/></DesktopSettings></Form>
   </FormSettings>
   <Permissions>ReadWriteMailbox</Permissions>
   <Rule xsi:type="RuleCollection" Mode="Or">
