@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import tempfile
 import threading
 import xml.etree.ElementTree as ET
@@ -754,7 +755,7 @@ def main() -> None:
         help="Comma-separated allowlist of job types",
     )
     args = parser.parse_args()
-    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
     count = run(max(1, min(args.limit, 25)), [value.strip() for value in args.job_types.split(",") if value.strip()])
     LOGGER.info("batch complete", extra={"processed": count})
 
