@@ -22,8 +22,10 @@ declare global {
 async function api(path:string, session:Session, init:RequestInit={}) {
   const isAppRoute=path.startsWith("/api/");
   const target=isAppRoute?path:`${SUPABASE_URL}${path}`;
-  const baseHeaders=isAppRoute?{}:{apikey:SUPABASE_KEY};
-  const response = await fetch(target, { ...init, headers:{ ...baseHeaders, Authorization:`Bearer ${session.access_token}`, ...(init.headers as Record<string,string>||{}) }, cache:"no-store" });
+  const headers:Record<string,string>={Authorization:`Bearer ${session.access_token}`};
+  if(!isAppRoute)headers.apikey=SUPABASE_KEY;
+  Object.assign(headers,(init.headers as Record<string,string>|undefined)||{});
+  const response = await fetch(target, { ...init, headers, cache:"no-store" });
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
   if(!response.ok) throw new Error(body?.error_description||body?.msg||body?.message||body?.error||`Request failed (${response.status})`);
