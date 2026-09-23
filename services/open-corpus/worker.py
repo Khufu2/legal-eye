@@ -19,6 +19,28 @@ import httpx
 
 LOGGER = logging.getLogger("legal-eye-open-corpus")
 USER_AGENT = "LOCKE/0.6 governed-open-corpus-worker"
+MAX_SOURCE_BYTES = int(os.environ.get("OPEN_CORPUS_MAX_SOURCE_BYTES", str(6 * 1024 * 1024)))
+EURLEX_SCOPE_VERSION = "primary-law-sectors-1-4-v1"
+
+
+class SourceDocumentTooLarge(RuntimeError):
+    pass
+
+
+def fetch_text_limited(client: httpx.Client, url: str, *, headers: dict[str, str], follow_redirects: bool = False) -> tuple[int, dict[str, str], str]:
+    with client.stream("GET", url, headers=headers, follow_redirects=follow_redirects) as response:
+        if response.status_code >= 400:
+            return response.status_code, dict(response.headers), ""
+        declared = response.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > MAX_SOURCE_BYTES:
+            raise SourceDocumentTooLarge(f"source body exceeds {MAX_SOURCE_BYTES} bytes")
+        body = bytearray()
+        for chunk in response.iter_bytes():
+            body.extend(chunk)
+            if len(body) > MAX_SOURCE_BYTES:
+                raise SourceDocumentTooLarge(f"source body exceeds {MAX_SOURCE_BYTES} bytes")
+        encoding = response.encoding or "utf-8"
+        return response.status_code, dict(response.headers), bytes(body).decode(encoding, errors="replace")
 
 
 def now() -> str:
@@ -413,8 +435,10 @@ def process_new_zealand(api: Api, source: dict[str, Any], limit: int) -> int:
 
 def process_eurlex(api: Api, source: dict[str, Any], limit: int) -> int:
     cursor = get_cursor(api, source["id"])
+    if cursor.get("scope_version") != EURLEX_SCOPE_VERSION:
+        cursor = {"scope_version": EURLEX_SCOPE_VERSION, "offset": 0}
     offset = int(cursor.get("offset", 0))
-    page_size = max(1, min(limit, 50))
+    page_size = max(1, min(limit, 12))
     query = f"""PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
 SELECT DISTINCT ?work ?celex ?date ?title ?resourceType WHERE {{
   ?work cdm:resource_legal_id_celex ?celex ;
@@ -425,7 +449,7 @@ SELECT DISTINCT ?work ?celex ?date ?title ?resourceType WHERE {{
       cdm:expression_uses_language <http://publications.europa.eu/resource/authority/language/ENG> ;
       cdm:expression_title ?title .
   }}
-  FILTER(REGEX(STR(?celex), "^[0-9][0-9A-Z]{{4,}}$"))
+  FILTER(REGEX(STR(?celex), "^[1234][0-9A-Z]{{4,}}$"))
 }}
 ORDER BY DESC(?date) DESC(?celex)
 LIMIT {page_size}
@@ -456,19 +480,23 @@ OFFSET {offset}"""
             continue
         canonical_url = f"https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:{quote(celex, safe='')}"
         content_url = f"http://publications.europa.eu/resource/celex/{quote(celex, safe='')}"
-        document = api.client.get(
-            content_url,
-            headers={
-                "accept": "application/xhtml+xml, application/xml;q=0.9, text/html;q=0.8, text/xml;q=0.7",
-                "accept-language": "en",
-                "user-agent": USER_AGENT,
-            },
-            follow_redirects=True,
-        )
-        if document.status_code >= 400:
-            LOGGER.warning("EUR-Lex text unavailable", extra={"celex": celex, "status": document.status_code})
+        try:
+            status, response_headers, raw = fetch_text_limited(
+                api.client,
+                content_url,
+                headers={
+                    "accept": "application/xhtml+xml, application/xml;q=0.9, text/html;q=0.8, text/xml;q=0.7",
+                    "accept-language": "en",
+                    "user-agent": USER_AGENT,
+                },
+                follow_redirects=True,
+            )
+        except SourceDocumentTooLarge:
+            LOGGER.warning("EUR-Lex source skipped because body is too large", extra={"celex": celex, "max_bytes": MAX_SOURCE_BYTES})
             continue
-        raw = document.text
+        if status >= 400:
+            LOGGER.warning("EUR-Lex text unavailable", extra={"celex": celex, "status": status})
+            continue
         if len(strip_markup(raw)) < 120:
             LOGGER.warning("EUR-Lex response had no usable legal text", extra={"celex": celex})
             continue
@@ -484,7 +512,7 @@ OFFSET {offset}"""
             citation=f"CELEX {celex}",
             published_at=published,
             raw=raw,
-            media_type=document.headers.get("content-type", "application/xhtml+xml").split(";", 1)[0],
+            media_type=response_headers.get("content-type", "application/xhtml+xml").split(";", 1)[0],
             metadata={
                 "celex": celex,
                 "work_uri": work_uri,
@@ -496,7 +524,7 @@ OFFSET {offset}"""
         completed += 1
 
     next_offset = offset + len(entries)
-    set_cursor(api, source["id"], {"offset": next_offset, "batch_size": page_size, "complete": len(entries) < page_size})
+    set_cursor(api, source["id"], {"scope_version": EURLEX_SCOPE_VERSION, "offset": next_offset, "batch_size": page_size, "complete": len(entries) < page_size})
     return completed
 
 
