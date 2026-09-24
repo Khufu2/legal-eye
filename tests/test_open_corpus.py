@@ -54,5 +54,18 @@ class IngestionTests(unittest.TestCase):
         self.assertEqual(api.state['cursor']['offset'], 7560)
         self.assertFalse(w.source_ready(api, {'id':'au'}))
         self.assertEqual(api.state['consecutive_failures'], 1)
+    def test_accepted_empty_feed_defers_without_losing_checkpoint(self):
+        api = FakeApi()
+        api.state = {'cursor': {'uk_entry_offset': 5, 'uk_next_feed': 'https://www.legislation.gov.uk/all/data.feed?page=7'}}
+        api.client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(202)))
+        with self.assertRaises(w.SourceNotReady) as context:
+            w.process_uk(api, {'id':'uk'}, 1)
+        w.record_failure(api, {'id':'uk'}, context.exception)
+        self.assertEqual(api.state['cursor']['uk_entry_offset'], 5)
+        self.assertEqual(api.state['cursor']['last_http_status'], 202)
+        self.assertNotIn('access_blocked', api.state['cursor'])
+        self.assertIsNotNone(api.state['next_attempt_at'])
+    def test_non_feed_xml_cannot_mark_backfill_complete(self):
+        with self.assertRaises(ValueError): w.uk_feed('<html><body>Unavailable</body></html>')
 
 if __name__ == '__main__': unittest.main()

@@ -27,6 +27,13 @@ class SourceDocumentTooLarge(RuntimeError):
     pass
 
 
+class SourceNotReady(RuntimeError):
+    """The source accepted the request but did not supply a document yet."""
+    def __init__(self, status: int):
+        self.status = status
+        super().__init__(f"Source returned HTTP {status} without a completed document")
+
+
 def fetch_text_limited(client: httpx.Client, url: str, *, headers: dict[str, str], follow_redirects: bool = False) -> tuple[int, dict[str, str], str]:
     with client.stream("GET", url, headers=headers, follow_redirects=follow_redirects) as response:
         if response.status_code >= 400:
@@ -319,6 +326,8 @@ def uk_feed(raw: str) -> tuple[list[dict[str, Any]], str | None]:
     if "<!ENTITY" in raw.upper():
         raise ValueError("XML entities are not supported")
     root = ET.fromstring(raw)
+    if root.tag != "{http://www.w3.org/2005/Atom}feed":
+        raise ValueError("UK source did not return an Atom feed")
     entries = []
     for entry in root.findall("a:entry", ATOM):
         links = entry.findall("a:link", ATOM)
@@ -335,6 +344,8 @@ def process_uk(api: Api, source: dict[str, Any], limit: int) -> int:
     feed_url = uk_url(cursor.get("uk_next_feed") or "https://www.legislation.gov.uk/all/data.feed?sort=published&page=1")
     response = api.client.get(feed_url, headers={"accept": "application/atom+xml"}, follow_redirects=True)
     response.raise_for_status()
+    if response.status_code in (202, 204) or not response.text.strip():
+        raise SourceNotReady(response.status_code)
     entries, next_url = uk_feed(response.text)
     offset = int(cursor.get("uk_entry_offset", 0))
     processed = 0
@@ -345,6 +356,8 @@ def process_uk(api: Api, source: dict[str, Any], limit: int) -> int:
         else:
             document = api.client.get(item["xml_url"], headers={"accept": "application/xml"}, follow_redirects=True)
             document.raise_for_status()
+            if document.status_code in (202, 204) or not document.text.strip():
+                raise SourceNotReady(document.status_code)
             if "<Legislation" not in document.text:
                 raise ValueError("UK source did not return a full CLML document")
             persist_document(api, source, external_id=item["id"], canonical_url=item["xml_url"].removesuffix("/data.xml"),
@@ -545,7 +558,7 @@ def record_failure(api: Api, source: dict[str, Any], error: Exception) -> None:
     prior = rows[0] if rows else {}
     cursor = dict(prior.get("cursor") or {})
     count = int(prior.get("consecutive_failures") or 0) + 1
-    status = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+    status = error.response.status_code if isinstance(error, httpx.HTTPStatusError) else error.status if isinstance(error, SourceNotReady) else None
     cursor.update({"last_error_at": now(), "last_http_status": status, "last_error_type": type(error).__name__})
     if status in (401, 403):
         cursor["access_blocked"] = True
@@ -577,7 +590,10 @@ def run(limit: int) -> int:
                 LOGGER.info("source batch complete", extra={"adapter": adapter, "processed": count})
             except Exception as error:
                 record_failure(api, source, error)
-                LOGGER.exception("source batch failed", extra={"adapter": adapter})
+                if isinstance(error, SourceNotReady):
+                    LOGGER.warning("source deferred: %s (HTTP %s); checkpoint preserved", adapter, error.status)
+                else:
+                    LOGGER.exception("source batch failed", extra={"adapter": adapter})
         return processed
     finally:
         api.close()
