@@ -798,6 +798,10 @@ html[data-theme="dark"] .view-vault .vault-document [data-slot=button]{
 
 
 /* Account recovery shares the workspace type and spacing system. */
+.auth-form label{color:var(--foreground);font-weight:500}
+.auth-form input,.auth-form select{color:var(--foreground);background:var(--card);border:1px solid var(--border);min-height:44px;border-radius:10px}
+.auth-form select{padding:10px;font:inherit}
+[data-slot=dialog-content]{max-height:calc(100dvh - 32px);overflow-y:auto}
 .account-recovery{min-height:100dvh;display:grid;place-items:center;padding:32px 20px;background:var(--background);color:var(--foreground)}
 .account-recovery-card{width:100%;max-width:420px;padding:32px;border:1px solid var(--border);border-radius:16px;background:var(--card)}
 .account-recovery-brand{display:flex;flex-direction:column;gap:4px;margin-bottom:32px;font-size:23px;letter-spacing:.08em;font-weight:600;text-decoration:none}
