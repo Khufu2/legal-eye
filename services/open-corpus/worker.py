@@ -604,8 +604,9 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=40)
     args = parser.parse_args()
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s", stream=sys.stdout)
+    LOGGER.info("open corpus worker release=2026-09-25 deferred-source-v1 commit=%s", os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"))
     total = run(max(2, min(args.limit, 100)))
-    LOGGER.info("open corpus batch complete", extra={"processed": total})
+    LOGGER.info("open corpus batch complete processed=%s", total)
 
 
 if __name__ == "__main__":

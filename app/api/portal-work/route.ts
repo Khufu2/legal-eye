@@ -1,3 +1,4 @@
+import { verifyPublishedCitations } from "@/lib/legal/evidence-validation";
 import { legalOutputSchema } from "@/lib/legal/structured-output";
 import { legalModelName } from "@/lib/legal/model";
 import { generateText, gateway, Output } from "ai";
@@ -111,7 +112,7 @@ export async function POST(request:Request){
     if(input.action==="ask"){
       if(!input.question)return json({error:"Question is required"},400);
       const context=await resourceContext(authorization,resources);
-      if(!context.length)return json({error:"No searchable resources have been published to this portal yet"},409);
+      if(!context.some(block=>block.text.trim()))return json({error:"No searchable resources have been published to this portal yet"},409);
       let conversationId=input.conversation_id;
       if(conversationId){
         const allowed=await rest<Array<{id:string}>>(authorization,`portal_conversations?select=id&id=eq.${conversationId}&portal_id=eq.${input.portal_id}&limit=1`);
@@ -120,7 +121,8 @@ export async function POST(request:Request){
       await appendMessage(authorization,conversationId,user.id,"user",input.question);
       const prompt=safeText(`CLIENT QUESTION:\n${input.question}\n\nPUBLISHED PORTAL MATERIAL ONLY:\n${context.map(b=>`RESOURCE ${b.resource_id} — ${b.label}\n${b.text}`).join("\n\n---\n\n")}`);
       const generated=await generateText({model:gateway(modelName),system:"You are the client-facing LOCKE assistant. Answer only from material explicitly published to this portal. Do not use hidden firm knowledge, unpublished workspace content, or invented authority. Every material proposition must be backed by a citation to one of the supplied resource IDs with an exact supporting quote. If the published material does not answer the question, say so clearly. This is legal work product for lawyer/client collaboration, not a substitute for final lawyer review.",prompt,output:Output.object({ schema: legalOutputSchema(answerSchema) }),providerOptions});
-      const answer=generated.output;
+      const answer={...generated.output,citations:verifyPublishedCitations(generated.output.citations,context)};
+      if(!answer.citations.length)answer.answer="The published material does not provide a verified answer to this question. Please ask your legal team.";
       await appendMessage(authorization,conversationId,null,"assistant",answer.answer,answer.citations);
       return json({...answer,conversation_id:conversationId,provider:"vercel-ai-gateway",model:modelName});
     }
@@ -146,3 +148,4 @@ export async function POST(request:Request){
     return json({error:message},message.includes("Credential-like")?400:502);
   }
 }
+

@@ -51,3 +51,14 @@ dated evidence, approver and expiry. “Implemented” is not interchangeable wi
 2. Complete lawyer acceptance for editor AI, agent execution, client portal and Office add-ins, including failures and recovery. Existing synthetic successes are documented above; they do not establish legal accuracy across jurisdictions.
 3. Resolve Canada's access review and the UK's deferred source responses; reconcile missing documents and currentness. Corpus totals are counts, not a completeness or competitor-parity claim. Licensed publisher material needs its own rights and access.
 4. Verify restore/recovery, monitoring and contractual handling of real client data before ordinary client-work handover.
+
+## 26 September 2026 release evidence
+
+- Office: guarded Word replacement, escaped Outlook reply HTML, callback-confirmed reply/cursor insertion, compose-subject support, bounded inputs instead of silent truncation. Session renewal and revocation added to Office and client portal; legacy non-refreshable tokens discarded.
+- Portal: reject generated citations unless their quotes occur in explicitly published source text. Model page numbers are not presented as verified. Empty evidence returns an explicit inability to answer.
+- Agent: optional server-side run persistence records running, failed and needs-review outcomes; only actually read private documents are labelled used. Generation has a 45-second abort budget. This is not a durable background-worker acceptance result.
+- Automated evidence: 17 Node tests passed on 25 September; Next production build passed. Office host adapters were tested with synthetic host doubles, not a live Word/Outlook installation.
+- Proposed indexed retrieval SQL returned the expected authority/citation in all 15 Tanzanian retrieval cases against the live corpus. The original benchmark timed out. This tests retrieval, not generated-answer accuracy or current-law completeness.
+- Pending database migrations: active portal revocation/publication validation and indexed retrieval. Both migration attempts must use write-authorized access; the current connector rejected DDL with SQLSTATE 25006. Do not disable read-only protection to apply them. Portal isolation test exists but has not run successfully.
+- Corpus snapshot 25 September 08:22 UTC: 26,996 records, 26,568 searchable documents, 175,424 chunks, 5 sources. Approved AU/EU workers were writing successfully; CA remained access-blocked and UK deferred. No proprietary competitor-corpus parity claim.
+- No full production acceptance claim: real account email flows, AI/editor/agent/portal end-to-end operation, native Office host behavior, lawyer quality review and operational recovery remain outstanding.
