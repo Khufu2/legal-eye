@@ -34,8 +34,11 @@ select count(*) chunks, count(embedding) embedded_chunks,
        sum(pg_column_size(embedding)) embedding_bytes,
        sum(octet_length(content)) utf8_content_bytes
 from public.legal_document_chunks;
-select count(*) documents, sum(octet_length(raw_content)) raw_content_bytes
+select count(*) documents, sum(octet_length(raw_text)) raw_text_bytes
 from public.legal_documents;
+select count(*) ingest_objects, sum(octet_length(raw_content)) raw_content_bytes,
+       max(octet_length(raw_content)) max_raw_object_bytes
+from public.source_ingest_objects;
 select status,count(*) from public.ingestion_jobs group by status;
 select source_id,canonical_url,count(*) duplicate_count
 from public.legal_documents where canonical_url is not null

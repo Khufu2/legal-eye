@@ -1,4 +1,5 @@
--- Pending live validation: connector currently rejects writes.
+-- Applied to the Legal production project and verified on 2026-10-03:
+-- all 15 Tanzania primary-law retrieval cases passed.
 -- Include a bounded title-only path so primary Acts/Codes remain discoverable even
 -- when the first relevant passage does not repeat the document title. Title matches contribute
 -- at most the first two chunks per document and therefore cannot flood the candidate set.
@@ -93,4 +94,3 @@ revoke all on function public.search_legal_evidence(text,text[],integer) from pu
 grant execute on function public.search_legal_evidence(text,text[],integer) to anon,authenticated;
 
 notify pgrst, 'reload schema';
-

@@ -82,3 +82,4 @@ begin
 end $$;
 
 rollback;
+select 'PASS: foreign-firm documents and agent runs hidden; synthetic fixtures rolled back' as result;

@@ -10,7 +10,7 @@ insert into public.organizations(id,name,slug) values(current_setting('locke.por
 insert into public.client_portals(id,organization_id,name,slug,status,created_by) values
 (current_setting('locke.portal_test_portal')::uuid,current_setting('locke.portal_test_org')::uuid,'Portal test',current_setting('locke.portal_test_portal'),'active',current_setting('locke.portal_test_user')::uuid);
 insert into public.portal_members(portal_id,user_id,role) values(current_setting('locke.portal_test_portal')::uuid,current_setting('locke.portal_test_user')::uuid,'guest');
-insert into public.drafts(id,organization_id,title,created_by,content) values(current_setting('locke.portal_test_draft')::uuid,current_setting('locke.portal_test_org')::uuid,'Published sentinel',current_setting('locke.portal_test_user')::uuid,'{"text":"Published text only"}');
+insert into public.drafts(id,organization_id,title,document_type,created_by,content) values(current_setting('locke.portal_test_draft')::uuid,current_setting('locke.portal_test_org')::uuid,'Published sentinel','memorandum',current_setting('locke.portal_test_user')::uuid,'{"text":"Published text only"}');
 insert into public.portal_resources(portal_id,resource_type,resource_id,created_by) values(current_setting('locke.portal_test_portal')::uuid,'draft',current_setting('locke.portal_test_draft')::uuid,current_setting('locke.portal_test_user')::uuid);
 select set_config('request.jwt.claims',json_build_object('sub',current_setting('locke.portal_test_user'),'role','authenticated')::text,true);
 set local role authenticated;
