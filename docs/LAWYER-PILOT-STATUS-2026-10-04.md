@@ -60,7 +60,7 @@ The signed-out browser rendered all twelve main feature screens. This does not v
 
 - TypeScript check, full production build and 21 Node tests passed for the application cutover.
 - Five focused gateway tests now pass, including fail-closed tokens, index path restrictions, table-of-contents downranking and checkpoint-retention safety.
-- Eighteen Python ingestion/migration tests passed, including capped disk-backed indexing and rejection of a failed remote hash receipt; new ingestion/runner modules compile.
+- Nineteen Python ingestion/migration tests passed, including capped disk-backed indexing, rejection of a failed remote hash receipt, and rejection of partial OCR after its time budget is exhausted; new ingestion/runner modules compile.
 - Fifteen live Tanzanian expected-authority title/citation retrieval cases pass against the published Cloudflare index. This measures title/citation recall, not passage relevance or answer correctness.
 - Verified raw/extracted remote hashes and full checkpoint restoration; no private firm data was included in the public rebuild.
 
@@ -73,3 +73,5 @@ The first Railway run reached AU 1,282; CA 2,812; EU 451; TZ 906; UK 707 before 
 Checkpoint compression, restoration and index construction were changed to stream through disk instead of holding the complete corpus/backup in RAM. Index postings are sorted in a temporary SQLite database and uploaded four bounded shards at a time; source concurrency was reduced to two workers per jurisdiction. Backups retain the latest three completed generations. A complete local round trip restored 6,026 records with peak memory approximately 83 MiB. The corrected Railway deployment `5c4b1780-efbd-4e8d-934b-489c6e49bc8c` successfully completed live checkpoint `backup-20261004T141138` (59,483,405 compressed bytes, eight verified parts) and continued importing afterward. The local source jobs were then interrupted so Railway owns the ongoing rebuild.
 
 Secure Supabase sign-in was submitted, but an image CAPTCHA now blocks verification of the dashboard session. Database recovery still needs that interactive step completed; no recovery operation, disk purchase or data deletion has been performed through the dashboard.
+
+At 17:25 Tanzania time the dashboard still showed the sign-in form, and management SQL still returned `ECONNREFUSED`. The ingestion service was updated to bound each scanned-document OCR pass to three minutes (plus any current page subprocess timeout), retaining failures for retry instead of accepting partial law text. Deployment `8394ea7b-16c9-4187-a8f6-1437d5a0b2cc`, commit `9abd9d2712fb3d20e2a420c1b4832d7fd8c3c67b`, started successfully. The live application inventory remained 6,090 documents / 84,030 passages. Authenticated feature acceptance and full source reconciliation remain open.
