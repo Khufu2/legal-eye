@@ -5,7 +5,7 @@ immutable hashes, complete-byte remote verification, resumable local receipts,
 and generation-based lexical indexes. This is not a private document processor.
 """
 from __future__ import annotations
-import argparse, collections, concurrent.futures, gzip, hashlib, importlib.util, json, math, os, pathlib, re, sqlite3, subprocess, tempfile, threading, time
+import argparse, collections, concurrent.futures, gzip, hashlib, importlib.util, json, math, os, pathlib, re, shutil, sqlite3, subprocess, tempfile, threading, time
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 import httpx
@@ -171,22 +171,32 @@ class Rebuild:
    self.batch(docs,{'eur-lex.europa.eu','publications.europa.eu'},workers)
  def publish(self):
   generation='rebuild-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S');counts={};chunks=0;latest=[]
-  with self.lock:rows=list(self.db.execute('SELECT jurisdiction,object_key,title,chunk_count,record FROM documents ORDER BY jurisdiction,id'))
-  by_j=collections.defaultdict(list)
-  for j,key,title,n,record in rows:by_j[j].append((key,title,json.loads(record)));counts[j]=counts.get(j,0)+1;chunks+=n
-  for j,documents in by_j.items():
-   shards=[collections.defaultdict(list) for _ in range(256)]
-   for key,title,doc in documents:
-    body=collections.Counter(tokens(' '.join(c['content'] for c in doc['chunks'])));titles=collections.Counter(tokens(title+' '+str(doc.get('citation') or '')))
-    for term in body.keys()|titles.keys():
-     weight=round(math.log1p(body[term])+titles[term]*15,3);shards[int(prefix(term),16)][term].append([key,weight])
+  with tempfile.TemporaryDirectory() as folder:
+   snapshot=sqlite3.connect(str(pathlib.Path(folder)/'snapshot.sqlite'))
+   with self.lock:self.db.backup(snapshot)
+   index_path=str(pathlib.Path(folder)/'index.sqlite');index=sqlite3.connect(index_path)
+   index.executescript('PRAGMA journal_mode=OFF; PRAGMA temp_store=FILE; CREATE TABLE postings(j TEXT,p INTEGER,term TEXT,key TEXT,weight REAL);')
+   for j,key,title,n,record in snapshot.execute('SELECT jurisdiction,object_key,title,chunk_count,record FROM documents'):
+    doc=json.loads(record);counts[j]=counts.get(j,0)+1;chunks+=n
+    body=collections.Counter()
+    for chunk in doc['chunks']:body.update(tokens(chunk['content']))
+    titles=collections.Counter(tokens(title+' '+str(doc.get('citation') or '')))
+    index.executemany('INSERT INTO postings VALUES (?,?,?,?,?)',((j,int(prefix(term),16),term,key,round(math.log1p(body[term])+titles[term]*15,3)) for term in body.keys()|titles.keys()))
     latest.append({k:doc.get(k) for k in ['title','citation','canonical_url','jurisdiction_code','document_type','published_at']})
-   def upload(item):
-    p,shard=item;data={term:sorted(values,key=lambda x:-x[1])[:256] for term,values in shard.items()};return self.call('/index','PUT',json={'key':f'search/{generation}/{j}/{p:02x}.json','data':data})
-   with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:list(pool.map(upload,enumerate(shards)))
-   self.call('/seal',json={'generation':generation,'jurisdiction':j})
-  if not rows:raise RuntimeError('No verified documents to publish')
-  manifest={'generation':generation,'as_of':now(),'jurisdictions':sorted(counts),'documents':len(rows),'chunks':chunks,'counts':counts,'latest':sorted(latest,key=lambda d:str(d.get('published_at') or ''),reverse=True)[:12],'coverage':'Rebuild in progress; source reconciliation required','index':'lexical title/content postings, bounded to 256 documents per term'}
+    latest=sorted(latest,key=lambda d:str(d.get('published_at') or ''),reverse=True)[:12]
+   snapshot.close();index.execute('CREATE INDEX lookup ON postings(j,p,term,weight DESC,key)');index.commit();index.close()
+   for j in sorted(counts):
+    def upload(p):
+     connection=sqlite3.connect(index_path);shard=collections.defaultdict(list)
+     try:
+      for term,key,weight in connection.execute('SELECT term,key,weight FROM postings WHERE j=? AND p=? ORDER BY term,weight DESC,key',(j,p)):
+       if len(shard[term])<256:shard[term].append([key,weight])
+     finally:connection.close()
+     return self.call('/index','PUT',json={'key':f'search/{generation}/{j}/{p:02x}.json','data':shard})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(upload,range(256)))
+    self.call('/seal',json={'generation':generation,'jurisdiction':j})
+  if not counts:raise RuntimeError('No verified documents to publish')
+  manifest={'generation':generation,'as_of':now(),'jurisdictions':sorted(counts),'documents':sum(counts.values()),'chunks':chunks,'counts':counts,'latest':latest,'coverage':'Rebuild in progress; source reconciliation required','index':'lexical title/content postings, bounded to 256 documents per term'}
   print(json.dumps(self.call('/publish',json=manifest)),flush=True)
 
  def checkpoint(self):
@@ -194,31 +204,39 @@ class Rebuild:
   with tempfile.TemporaryDirectory() as folder:
    target=sqlite3.connect(str(pathlib.Path(folder)/'corpus.sqlite'))
    with self.lock:self.db.backup(target)
-   target.close();body=gzip.compress((pathlib.Path(folder)/'corpus.sqlite').read_bytes(),compresslevel=3)
-  parts=[]
-  for offset in range(0,len(body),8*1024*1024):
-   part=body[offset:offset+8*1024*1024];key=f'checkpoints/{generation}/part-{len(parts)}'
-   receipt=self.call('/checkpoint','PUT',params={'key':key},content=part)
-   if receipt.get('sha256')!=digest(part):raise ValueError('Checkpoint hash mismatch')
-   parts.append({'key':key,'sha256':digest(part)})
-  manifest={'generation':generation,'parts':parts,'sha256':digest(body),'as_of':now()}
+   target.close();compressed=pathlib.Path(folder)/'corpus.sqlite.gz'
+   with (pathlib.Path(folder)/'corpus.sqlite').open('rb') as source,gzip.open(compressed,'wb',compresslevel=3) as output:shutil.copyfileobj(source,output,1024*1024)
+   parts=[];overall=hashlib.sha256();size=0
+   with compressed.open('rb') as stream:
+    while part:=stream.read(8*1024*1024):
+     overall.update(part);size+=len(part);key=f'checkpoints/{generation}/part-{len(parts)}'
+     receipt=self.call('/checkpoint','PUT',params={'key':key},content=part)
+     if receipt.get('sha256')!=digest(part):raise ValueError('Checkpoint hash mismatch')
+     parts.append({'key':key,'sha256':digest(part)})
+  manifest={'generation':generation,'parts':parts,'sha256':overall.hexdigest(),'as_of':now()}
   self.call('/checkpoint','PUT',params={'key':f'checkpoints/{generation}/manifest.json'},content=json.dumps(manifest).encode())
   self.call('/checkpoint-prune',json={})
-  print(json.dumps({'checkpoint':generation,'compressed_bytes':len(body),'parts':len(parts)}),flush=True)
+  print(json.dumps({'checkpoint':generation,'compressed_bytes':size,'parts':len(parts)}),flush=True)
 
 def restore_checkpoint(endpoint,database):
  token=os.environ['LOCKE_CORPUS_INGEST_TOKEN'];headers={'authorization':'Bearer '+token}
  with httpx.Client(timeout=120) as client:
   result=client.get(endpoint+'/checkpoint',headers=headers)
   if result.status_code==404:return
-  result.raise_for_status();manifest=result.json();parts=[]
-  for part in manifest['parts']:
-   r=client.get(endpoint+'/checkpoint',headers=headers,params={'key':part['key']});r.raise_for_status()
-   if digest(r.content)!=part['sha256']:raise ValueError('Checkpoint part hash mismatch')
-   parts.append(r.content)
-  body=b''.join(parts)
-  if digest(body)!=manifest['sha256']:raise ValueError('Checkpoint hash mismatch')
-  pathlib.Path(database).write_bytes(gzip.decompress(body))
+  result.raise_for_status();manifest=result.json();overall=hashlib.sha256()
+  with tempfile.TemporaryDirectory() as folder:
+   archive=pathlib.Path(folder)/'checkpoint.gz'
+   with archive.open('wb') as stream:
+    for part in manifest['parts']:
+     r=client.get(endpoint+'/checkpoint',headers=headers,params={'key':part['key']});r.raise_for_status()
+     if digest(r.content)!=part['sha256']:raise ValueError('Checkpoint part hash mismatch')
+     overall.update(r.content);stream.write(r.content)
+   if overall.hexdigest()!=manifest['sha256']:raise ValueError('Checkpoint hash mismatch')
+   restored=pathlib.Path(folder)/'restored.sqlite'
+   with gzip.open(archive,'rb') as source,restored.open('wb') as target:shutil.copyfileobj(source,target,1024*1024)
+   check=sqlite3.connect(str(restored));valid=check.execute('PRAGMA integrity_check').fetchone()[0]=='ok';check.close()
+   if not valid:raise ValueError('Checkpoint database integrity check failed')
+   shutil.copyfile(restored,database)
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--endpoint',default='https://locke-corpus.ivogeraldladjr.workers.dev');p.add_argument('--secrets',default='work/cloudflare-operator.json');p.add_argument('--database',default='work/cloudflare-corpus.sqlite');p.add_argument('--jurisdictions',nargs='+',choices=['TZ','CA','AU','UK','EU'],default=['TZ']);p.add_argument('--workers',type=int,default=4);p.add_argument('--publish-only',action='store_true');p.add_argument('--no-publish',action='store_true');a=p.parse_args()

@@ -60,8 +60,14 @@ The signed-out browser rendered all twelve main feature screens. This does not v
 
 - TypeScript check, full production build and 21 Node tests passed for the application cutover.
 - Five focused gateway tests now pass, including fail-closed tokens, index path restrictions, table-of-contents downranking and checkpoint-retention safety.
-- Sixteen Python ingestion/migration tests passed; new ingestion/runner modules compile.
+- Eighteen Python ingestion/migration tests passed, including capped disk-backed indexing and rejection of a failed remote hash receipt; new ingestion/runner modules compile.
 - Fifteen live Tanzanian expected-authority title/citation retrieval cases pass against the published Cloudflare index. This measures title/citation recall, not passage relevance or answer correctness.
 - Verified raw/extracted remote hashes and full checkpoint restoration; no private firm data was included in the public rebuild.
 
 Use the existing `LAWYER-PILOT-GUIDE.md` only after the backend gate is resolved and its authenticated acceptance checklist is completed. **Do not label this release fully functional or hand it over for ordinary client work on the present evidence.**
+
+## Ingestion recovery during this release
+
+The first Railway run reached AU 1,282; CA 2,812; EU 451; TZ 906; UK 707 before crashing around its first checkpoint. Railway memory telemetry peaked at approximately 1 GB. These objects remain in R2, but receipts after the last completed checkpoint must be rediscovered.
+
+Checkpoint compression, restoration and index construction were changed to stream through disk instead of holding the complete corpus/backup in RAM. Index postings are sorted in a temporary SQLite database and uploaded four bounded shards at a time; source concurrency was reduced to two workers per jurisdiction. Backups retain the latest three completed generations. The corrected service must demonstrate a completed live checkpoint before its unattended run is considered verified.

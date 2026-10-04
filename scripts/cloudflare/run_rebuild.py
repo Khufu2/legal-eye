@@ -14,14 +14,14 @@ runner=Rebuild(endpoint,'unused-environment-token',database)
 
 def rebuild(j):
  try:
-  getattr(runner,{'TZ':'tanzania','CA':'canada','AU':'australia','UK':'uk','EU':'eu'}[j])(3)
+  getattr(runner,{'TZ':'tanzania','CA':'canada','AU':'australia','UK':'uk','EU':'eu'}[j])(2)
   return {'jurisdiction':j,'discovery_finished':True}
  except Exception as error:
   return {'jurisdiction':j,'discovery_finished':False,'error':type(error).__name__+': '+str(error)[:150]}
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
  futures=[pool.submit(rebuild,j) for j in ['TZ','CA','AU','UK','EU']]
- last_checkpoint=time.monotonic();last_publish=last_checkpoint
+ last_publish=time.monotonic();last_checkpoint=last_publish-240
  while any(not future.done() for future in futures):
   time.sleep(15)
   try:
