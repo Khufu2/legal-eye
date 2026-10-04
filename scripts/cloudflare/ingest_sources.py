@@ -203,6 +203,7 @@ class Rebuild:
    parts.append({'key':key,'sha256':digest(part)})
   manifest={'generation':generation,'parts':parts,'sha256':digest(body),'as_of':now()}
   self.call('/checkpoint','PUT',params={'key':f'checkpoints/{generation}/manifest.json'},content=json.dumps(manifest).encode())
+  self.call('/checkpoint-prune',json={})
   print(json.dumps({'checkpoint':generation,'compressed_bytes':len(body),'parts':len(parts)}),flush=True)
 
 def restore_checkpoint(endpoint,database):

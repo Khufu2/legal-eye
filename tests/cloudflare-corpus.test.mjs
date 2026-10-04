@@ -22,3 +22,9 @@ test('index paths cannot escape the versioned search namespace',async()=>{
  const response=await worker.fetch(new Request('https://example.org/index',{method:'PUT',headers:{authorization:'Bearer test'},body:JSON.stringify({key:'raw/private',data:{}})}),{INGEST_TOKEN:'test'});
  assert.equal(response.status,400);
 });
+test('checkpoint cleanup retains three complete backups and newer in-flight parts',async()=>{
+ const keys=['checkpoints/current.json',...['backup-1','backup-2','backup-3','backup-4'].flatMap(g=>[`checkpoints/${g}/manifest.json`,`checkpoints/${g}/part-0`]),'checkpoints/backup-5/part-0','raw/TZ/authority'];
+ const removed=[];
+ const response=await worker.fetch(new Request('https://example.org/checkpoint-prune',{method:'POST',headers:{authorization:'Bearer test'}}),{INGEST_TOKEN:'test',CORPUS:{get:async()=>({json:async()=>({generation:'backup-4'})}),list:async()=>({objects:keys.filter(k=>k.startsWith('checkpoints/')).map(key=>({key})),truncated:false}),delete:async key=>removed.push(key)}});
+ assert.equal(response.status,200);assert.deepEqual(removed,['checkpoints/backup-1/manifest.json','checkpoints/backup-1/part-0']);
+});

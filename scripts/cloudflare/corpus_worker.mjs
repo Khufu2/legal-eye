@@ -67,6 +67,16 @@ export default {async fetch(request,env){
   return await search(request,env);
  }
  if(!env.INGEST_TOKEN||request.headers.get('authorization')!==`Bearer ${env.INGEST_TOKEN}`)return json({error:'Unauthorized'},401);
+ if(path==='/checkpoint-prune'&&request.method==='POST'){
+  const current=await read(env,'checkpoints/current.json');if(!current)return json({removed:0});
+  let objects=[],cursor;
+  do{const page=await env.CORPUS.list({prefix:'checkpoints/',limit:1000,cursor});objects.push(...page.objects);cursor=page.truncated?page.cursor:undefined;}while(cursor);
+  const complete=objects.filter(o=>o.key.endsWith('/manifest.json')).map(o=>o.key.split('/')[1]).sort().reverse();
+  const keep=new Set([current.generation,...complete.slice(0,3)]),cutoff=complete.slice(0,3).at(-1);
+  const stale=objects.filter(o=>/^checkpoints\/backup-/.test(o.key)&&o.key.split('/')[1]<cutoff&&!keep.has(o.key.split('/')[1]));
+  for(const obj of stale)await env.CORPUS.delete(obj.key);
+  return json({removed:stale.length,retained_generations:[...keep]});
+ }
  if(path==='/checkpoint'&&request.method==='PUT'){
   const key=new URL(request.url).searchParams.get('key');
   if(!/^checkpoints\/[a-zA-Z0-9_-]+\/(manifest\.json|part-[0-9]+)$/.test(key||''))return json({error:'Invalid checkpoint key'},400);
