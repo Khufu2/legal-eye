@@ -1,4 +1,5 @@
 import importlib.util, json, os, pathlib, tempfile, unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -6,6 +7,14 @@ spec=importlib.util.spec_from_file_location('cloudflare_rebuild',ROOT/'scripts/c
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 
 class CloudflareRebuildTests(unittest.TestCase):
+ def test_scanned_document_budget_exhaustion_never_accepts_partial_text(self):
+  with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'LOCKE_CORPUS_INGEST_TOKEN':'unit-test'}):
+   runner=module.Rebuild('https://locke-corpus.ivogeraldladjr.workers.dev','unused',folder+'/db.sqlite')
+   with patch.object(module.subprocess,'run',side_effect=[SimpleNamespace(stdout=b''),SimpleNamespace(stdout='Pages: 10\n')]),patch.object(module.time,'monotonic',side_effect=[0,181]):
+    with self.assertRaisesRegex(ValueError,'OCR time budget'):runner.ingest({'external_id':'synthetic','title':'Synthetic','jurisdiction_code':'TZ'},b'%PDF synthetic','application/pdf')
+   self.assertEqual(runner.db.execute('SELECT count(*) FROM documents').fetchone()[0],0)
+   runner.client.close();runner.db.close()
+
  def test_streamed_index_limits_postings_and_preserves_snapshot_counts(self):
   with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'LOCKE_CORPUS_INGEST_TOKEN':'unit-test'}):
    runner=module.Rebuild('https://locke-corpus.ivogeraldladjr.workers.dev','unused',folder+'/db.sqlite')

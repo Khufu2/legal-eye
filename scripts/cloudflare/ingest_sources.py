@@ -67,8 +67,9 @@ class Rebuild:
      info=subprocess.run(['pdfinfo',str(p)],capture_output=True,text=True,timeout=15,check=True)
      count=int(re.search(r'^Pages:\s+(\d+)',info.stdout,re.M).group(1))
      if count>250:raise ValueError('Scanned document exceeds bounded OCR page limit')
-     pages=[]
+     pages=[];ocr_started=time.monotonic()
      for page in range(1,count+1):
+      if time.monotonic()-ocr_started>180:raise ValueError('Scanned document exceeded OCR time budget; retained for retry')
       image=pathlib.Path(d)/'page'
       subprocess.run(['pdftoppm','-f',str(page),'-l',str(page),'-r','130','-singlefile','-png',str(p),str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=45,check=True)
       ocr=subprocess.run(['tesseract',str(image)+'.png','stdout','-l','eng','--psm','3'],capture_output=True,timeout=60,check=True)
