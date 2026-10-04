@@ -5,7 +5,7 @@ immutable hashes, complete-byte remote verification, resumable local receipts,
 and generation-based lexical indexes. This is not a private document processor.
 """
 from __future__ import annotations
-import argparse, collections, concurrent.futures, hashlib, importlib.util, json, math, os, pathlib, re, sqlite3, subprocess, tempfile, threading, time
+import argparse, collections, concurrent.futures, gzip, hashlib, importlib.util, json, math, os, pathlib, re, sqlite3, subprocess, tempfile, threading, time
 from datetime import datetime, timezone
 from urllib.parse import quote, urlparse
 import httpx
@@ -27,9 +27,9 @@ def prefix(word):
 class Rebuild:
  def __init__(self,endpoint,secret_file,database):
   if not endpoint.startswith('https://locke-corpus.') or urlparse(endpoint).hostname!='locke-corpus.ivogeraldladjr.workers.dev':raise ValueError('Unexpected gateway')
-  self.endpoint=endpoint.rstrip('/');self.secret=json.loads(pathlib.Path(secret_file).read_text())['ingest_token']
+  self.endpoint=endpoint.rstrip('/');self.secret=os.environ.get('LOCKE_CORPUS_INGEST_TOKEN') or json.loads(pathlib.Path(secret_file).read_text())['ingest_token']
   self.client=httpx.Client(timeout=httpx.Timeout(120,connect=15),headers={'user-agent':'LOCKE/0.7 governed-corpus-rebuild'})
-  self.db=sqlite3.connect(database,check_same_thread=False);self.lock=threading.Lock()
+  self.db=sqlite3.connect(database,check_same_thread=False,timeout=60);self.lock=threading.Lock()
   self.db.executescript('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY,jurisdiction TEXT,external_id TEXT,hash TEXT,object_key TEXT,title TEXT,chunk_count INTEGER,record TEXT); CREATE TABLE IF NOT EXISTS errors (jurisdiction TEXT,external_id TEXT,error TEXT,at TEXT); CREATE TABLE IF NOT EXISTS discovery (jurisdiction TEXT,external_id TEXT,record TEXT,PRIMARY KEY(jurisdiction,external_id));')
  def call(self,path,method='POST',**kwargs):
   for attempt in range(3):
@@ -80,6 +80,7 @@ class Rebuild:
      chunks.append({'content':piece,'page_number':page,'source_node_ref':f'page/{page}/text/{i}'})
   else:
    text=raw.decode('utf-8',errors='strict')
+   if not doc.get('title','').strip():doc['title']=upstream.title_from_markup(text,'Legislation '+doc['external_id'])
    if doc['jurisdiction_code']=='AU' and 'Table of contents' in upstream.strip_markup(text) and not re.search(r'\b(Short title|Appropriation|Be it enacted|[Ss]ection [1-9])\b',upstream.strip_markup(text)):
     raise ValueError('Website shell is not legislative text')
    if '<!ENTITY' in text.upper():raise ValueError('XML entities rejected')
@@ -94,8 +95,8 @@ class Rebuild:
   return receipt
  def run_one(self,doc,allowed):
   try:
-   with self.lock:done=self.db.execute('SELECT 1 FROM documents WHERE jurisdiction=? AND external_id=?',(doc['jurisdiction_code'],doc['external_id'])).fetchone()
-   if done:return
+   with self.lock:done=self.db.execute('SELECT title FROM documents WHERE jurisdiction=? AND external_id=?',(doc['jurisdiction_code'],doc['external_id'])).fetchone()
+   if done and done[0].strip():return
    raw,mime=self.fetch(doc.get('source_url',doc['canonical_url']),allowed);self.ingest(doc,raw,mime)
   except Exception as e:
    with self.lock:self.db.execute('INSERT INTO errors VALUES (?,?,?,?)',(doc['jurisdiction_code'],doc['external_id'],type(e).__name__+': '+str(e)[:160],now()));self.db.commit()
@@ -187,6 +188,36 @@ class Rebuild:
   if not rows:raise RuntimeError('No verified documents to publish')
   manifest={'generation':generation,'as_of':now(),'jurisdictions':sorted(counts),'documents':len(rows),'chunks':chunks,'counts':counts,'latest':sorted(latest,key=lambda d:str(d.get('published_at') or ''),reverse=True)[:12],'coverage':'Rebuild in progress; source reconciliation required','index':'lexical title/content postings, bounded to 256 documents per term'}
   print(json.dumps(self.call('/publish',json=manifest)),flush=True)
+
+ def checkpoint(self):
+  generation='backup-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')
+  with tempfile.TemporaryDirectory() as folder:
+   target=sqlite3.connect(str(pathlib.Path(folder)/'corpus.sqlite'))
+   with self.lock:self.db.backup(target)
+   target.close();body=gzip.compress((pathlib.Path(folder)/'corpus.sqlite').read_bytes(),compresslevel=3)
+  parts=[]
+  for offset in range(0,len(body),8*1024*1024):
+   part=body[offset:offset+8*1024*1024];key=f'checkpoints/{generation}/part-{len(parts)}'
+   receipt=self.call('/checkpoint','PUT',params={'key':key},content=part)
+   if receipt.get('sha256')!=digest(part):raise ValueError('Checkpoint hash mismatch')
+   parts.append({'key':key,'sha256':digest(part)})
+  manifest={'generation':generation,'parts':parts,'sha256':digest(body),'as_of':now()}
+  self.call('/checkpoint','PUT',params={'key':f'checkpoints/{generation}/manifest.json'},content=json.dumps(manifest).encode())
+  print(json.dumps({'checkpoint':generation,'compressed_bytes':len(body),'parts':len(parts)}),flush=True)
+
+def restore_checkpoint(endpoint,database):
+ token=os.environ['LOCKE_CORPUS_INGEST_TOKEN'];headers={'authorization':'Bearer '+token}
+ with httpx.Client(timeout=120) as client:
+  result=client.get(endpoint+'/checkpoint',headers=headers)
+  if result.status_code==404:return
+  result.raise_for_status();manifest=result.json();parts=[]
+  for part in manifest['parts']:
+   r=client.get(endpoint+'/checkpoint',headers=headers,params={'key':part['key']});r.raise_for_status()
+   if digest(r.content)!=part['sha256']:raise ValueError('Checkpoint part hash mismatch')
+   parts.append(r.content)
+  body=b''.join(parts)
+  if digest(body)!=manifest['sha256']:raise ValueError('Checkpoint hash mismatch')
+  pathlib.Path(database).write_bytes(gzip.decompress(body))
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--endpoint',default='https://locke-corpus.ivogeraldladjr.workers.dev');p.add_argument('--secrets',default='work/cloudflare-operator.json');p.add_argument('--database',default='work/cloudflare-corpus.sqlite');p.add_argument('--jurisdictions',nargs='+',choices=['TZ','CA','AU','UK','EU'],default=['TZ']);p.add_argument('--workers',type=int,default=4);p.add_argument('--publish-only',action='store_true');p.add_argument('--no-publish',action='store_true');a=p.parse_args()

@@ -67,6 +67,20 @@ export default {async fetch(request,env){
   return await search(request,env);
  }
  if(!env.INGEST_TOKEN||request.headers.get('authorization')!==`Bearer ${env.INGEST_TOKEN}`)return json({error:'Unauthorized'},401);
+ if(path==='/checkpoint'&&request.method==='PUT'){
+  const key=new URL(request.url).searchParams.get('key');
+  if(!/^checkpoints\/[a-zA-Z0-9_-]+\/(manifest\.json|part-[0-9]+)$/.test(key||''))return json({error:'Invalid checkpoint key'},400);
+  const bytes=await request.arrayBuffer();if(bytes.byteLength>8*1024*1024)return json({error:'Checkpoint part too large'},413);
+  const hash=await sha(bytes);await env.CORPUS.put(key,bytes,{customMetadata:{sha256:hash}});
+  const check=await env.CORPUS.get(key);if(!check||await sha(await check.arrayBuffer())!==hash)return json({error:'Checkpoint verification failed'},502);
+  if(key.endsWith('/manifest.json'))await env.CORPUS.put('checkpoints/current.json',bytes);
+  return json({verified:true,sha256:hash});
+ }
+ if(path==='/checkpoint'&&request.method==='GET'){
+  const key=new URL(request.url).searchParams.get('key')||'checkpoints/current.json';
+  if(key!=='checkpoints/current.json'&&!/^checkpoints\/[a-zA-Z0-9_-]+\/(manifest\.json|part-[0-9]+)$/.test(key))return json({error:'Invalid checkpoint key'},400);
+  const obj=await env.CORPUS.get(key);return obj?new Response(obj.body,{headers:{'cache-control':'private, no-store'}}):json({error:'Checkpoint not found'},404);
+ }
  if(path==='/ingest'&&request.method==='POST')return await ingest(request,env);
  if(path==='/index'&&request.method==='PUT'){
   const {key,data}=await request.json();
