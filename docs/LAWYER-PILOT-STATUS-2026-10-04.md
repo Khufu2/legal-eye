@@ -15,17 +15,17 @@
 
 The last successful Supabase inventory on 3 October contained 28,032 legal documents and 180,873 chunks. It showed searchable AU 14,438; CA 5,857; EU 1,904; TZ 5,317; UK 86. Today's database cannot be queried, so these are historical measurements, not a fresh SQL inventory.
 
-The published Cloudflare snapshot at 13:51 UTC contains **4,014 verified documents / 70,531 passages**:
+The published Cloudflare snapshot at 14:13 UTC contains **6,090 verified documents / 84,030 passages**:
 
 | Jurisdiction | Published documents | Source |
 | --- | ---: | --- |
-| Tanzania | 767 | Attorney General OAG MIS, eight catalogue collections |
-| Canada | 1,799 | Justice Canada official English XML repository |
-| Australia | 900 | Federal Register of Legislation official PDFs |
-| EU | 184 | Official Publications Office / EUR-Lex Cellar content |
+| Tanzania | 1,139 | Attorney General OAG MIS, eight catalogue collections |
+| Canada | 2,939 | Justice Canada official English XML repository |
+| Australia | 1,313 | Federal Register of Legislation official PDFs |
+| EU | 335 | Official Publications Office / EUR-Lex Cellar content |
 | UK | 364 | legislation.gov.uk structured legislative XML |
 
-Railway subsequently reported AU 1,186; CA 2,640; EU 341; TZ 903; UK 566 verified documents at 13:52 UTC. These later receipts are not all in the published snapshot yet. Counts will change while the job runs.
+Railway subsequently reported AU 1,409; CA 3,471; EU 666; TZ 1,143; UK 995 verified documents at 14:14 UTC (7,684 total). These later receipts are not all in the published snapshot yet. Counts will change while the job runs.
 
 This is a **source rebuild**, not a reconciled copy of the old database. Coverage is explicitly marked incomplete. Canada discovers 5,863 current English XML files. Australian discovery currently selects in-force titles; its live catalogue reports 51,404 such titles, while the full historical catalogue reports 132,509. UK discovery is capped at 100 feed pages; EU at 2,200 primary-sector records. Neither run establishes all historical law, all judgments, all amendments, or equivalent coverage to the previous snapshot. Unusable text, oversized files, bounded OCR failures and official-source 404s are retained as failed attempts rather than counted as successful ingestion.
 
@@ -70,4 +70,6 @@ Use the existing `LAWYER-PILOT-GUIDE.md` only after the backend gate is resolved
 
 The first Railway run reached AU 1,282; CA 2,812; EU 451; TZ 906; UK 707 before crashing around its first checkpoint. Railway memory telemetry peaked at approximately 1 GB. These objects remain in R2, but receipts after the last completed checkpoint must be rediscovered.
 
-Checkpoint compression, restoration and index construction were changed to stream through disk instead of holding the complete corpus/backup in RAM. Index postings are sorted in a temporary SQLite database and uploaded four bounded shards at a time; source concurrency was reduced to two workers per jurisdiction. Backups retain the latest three completed generations. The corrected service must demonstrate a completed live checkpoint before its unattended run is considered verified.
+Checkpoint compression, restoration and index construction were changed to stream through disk instead of holding the complete corpus/backup in RAM. Index postings are sorted in a temporary SQLite database and uploaded four bounded shards at a time; source concurrency was reduced to two workers per jurisdiction. Backups retain the latest three completed generations. A complete local round trip restored 6,026 records with peak memory approximately 83 MiB. The corrected Railway deployment `5c4b1780-efbd-4e8d-934b-489c6e49bc8c` successfully completed live checkpoint `backup-20261004T141138` (59,483,405 compressed bytes, eight verified parts) and continued importing afterward. The local source jobs were then interrupted so Railway owns the ongoing rebuild.
+
+Secure Supabase sign-in was submitted, but an image CAPTCHA now blocks verification of the dashboard session. Database recovery still needs that interactive step completed; no recovery operation, disk purchase or data deletion has been performed through the dashboard.

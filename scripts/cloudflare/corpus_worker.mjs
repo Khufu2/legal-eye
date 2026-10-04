@@ -29,7 +29,7 @@ async function ingest(request,env){
  if(!existing)await env.CORPUS.put(rawKey,bytes,{sha256:hash,httpMetadata:{contentType:raw.type||'application/octet-stream',cacheControl:'private, no-store'},customMetadata:{sha256:hash}});
  const remote=await env.CORPUS.get(rawKey); if(!remote||await sha(await remote.arrayBuffer())!==hash)return json({error:'R2 verification failed'},502);
  const stored={...document,id,raw_r2_key:rawKey,source_name:source.name,attribution:source.attribution,parser_version:document.parser_version||'locke-open-text-v1',indexed_at:new Date().toISOString()};
- const docKey=`documents/${id}/${hash}.json`, body=JSON.stringify(stored), bodyHash=await sha(new TextEncoder().encode(body));
+ const body=JSON.stringify(stored), bodyHash=await sha(new TextEncoder().encode(body)),docKey=`documents/${id}/${hash}/${bodyHash}.json`;
  await env.CORPUS.put(docKey,body,{httpMetadata:{contentType:'application/json',cacheControl:'private, no-store'},customMetadata:{sha256:bodyHash}});
  const check=await env.CORPUS.get(docKey);if(!check||await sha(await check.arrayBuffer())!==bodyHash)return json({error:'Extracted body verification failed'},502);
  return json({id,document_key:docKey,content_sha256:hash,extracted_sha256:bodyHash,bytes:raw.size,chunks:document.chunks.length,verified:true});
