@@ -100,6 +100,21 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
 
   const queries=buildSearchQueries(options.query);
   const publicSearch = async () => {
+    const corpusUrl = process.env.LEGAL_CORPUS_URL?.trim();
+    const corpusToken = process.env.LEGAL_CORPUS_SEARCH_TOKEN?.trim();
+    if (corpusUrl) {
+      if (!corpusToken) throw new Error('Cloudflare corpus search configuration is incomplete.');
+      const result = await fetch(`${corpusUrl.replace(/\/$/, '')}/search`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${corpusToken}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ query: searchTerms(options.query).join(' ') || options.query, jurisdictions: options.jurisdictions, limit: 24 }),
+        cache: 'no-store', signal: AbortSignal.timeout(25000),
+      });
+      if (!result.ok) throw new Error(`Public legal corpus search is unavailable (${result.status}). No legal conclusion was generated.`);
+      const data = await result.json();
+      if (!Array.isArray(data.evidence)) throw new Error('Public corpus returned an invalid evidence response.');
+      return data.evidence;
+    }
     let lastError: unknown = null;
     for (const pQuery of queries) {
       try {

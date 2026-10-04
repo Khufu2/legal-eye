@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       }
       if (!publicEvidence.length && !privateEvidence.length) return response({...evidence,answer:"Insufficient evidence: no matching source passages were found in the selected jurisdictions or accessible firm documents. Try naming the Act, legal issue, or relevant clause. This result does not establish that no authority exists."});
       const format = (rows: Evidence[], prefix: string) => rows.map((row, index) =>
-        `[${prefix}${index + 1}] ${row.title ?? "Untitled"} ${row.citation ?? ""}\n${row.content ?? ""}`
+        `[${prefix}${index + 1}] ${row.title ?? "Untitled"} ${row.citation ?? ""}\nType: ${row.document_type ?? 'unknown'}; Jurisdiction: ${row.jurisdiction_code ?? 'unknown'}; Published: ${row.published_at ?? 'unknown'}; Retrieved: ${row.retrieved_at ?? 'unknown'}; Page: ${row.page_number ?? 'unknown'}\nVersion: ${row.version_notice ?? 'Currentness requires verification'}; OCR requires verification: ${Boolean(row.ocr_requires_verification)}\nSource: ${row.canonical_url ?? row.source_url ?? 'unknown'}\n${row.content ?? ""}`
       ).join("\n\n");
       const prompt = dlp(`Prior conversation (context only, not verified authority): ${JSON.stringify(input.conversation || [])}\nResearch question: ${input.query}\nJurisdictions: ${(input.jurisdictions ?? ["TZ"]).join(", ")}\n\nPUBLIC EVIDENCE:\n${format(publicEvidence, "P")}\n\nPRIVATE FIRM EVIDENCE:\n${format(privateEvidence, "F")}`);
       const generated = await generateText({
