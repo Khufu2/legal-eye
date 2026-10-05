@@ -99,6 +99,7 @@ export async function POST(request: Request) {
       headers: { apikey: supabaseKey, authorization },
       cache: "no-store",
     });
+    if (userCheck.status >= 500 || [402,429].includes(userCheck.status)) return response({ error: "The workspace backend is temporarily unavailable. Please retry after service recovery." }, 503);
     if (!userCheck.ok) return response({ error: "Invalid or expired session" }, 401);
     const user = await userCheck.json() as { id: string };
 
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
       `${supabaseUrl}/rest/v1/organization_members?select=organization_id&organization_id=eq.${encodeURIComponent(input.organization_id)}&user_id=eq.${encodeURIComponent(user.id)}&is_active=is.true&limit=1`,
       { headers: { apikey: supabaseKey, authorization }, cache: "no-store" },
     );
+    if (membershipCheck.status >= 500 || [402,429].includes(membershipCheck.status)) return response({ error: "The workspace backend is temporarily unavailable. Please retry after service recovery." }, 503);
     const memberships = membershipCheck.ok ? await membershipCheck.json().catch(() => []) : [];
     if (!membershipCheck.ok || !memberships?.length) return response({ error: "Organization access denied" }, 403);
 
