@@ -22,6 +22,15 @@ test('index paths cannot escape the versioned search namespace',async()=>{
  const response=await worker.fetch(new Request('https://example.org/index',{method:'PUT',headers:{authorization:'Bearer test'},body:JSON.stringify({key:'raw/private',data:{}})}),{INGEST_TOKEN:'test'});
  assert.equal(response.status,400);
 });
+test('serialized index upload verifies exact stored bytes and rejects corruption',async()=>{
+ const bytes=new TextEncoder().encode('{"employment":[["documents/test",2]]}');
+ for(const corrupt of [false,true]){
+  let stored;
+  const response=await worker.fetch(new Request('https://example.org/index?key=search/test/TZ/00.json',{method:'PUT',headers:{authorization:'Bearer test'},body:bytes}),{INGEST_TOKEN:'test',CORPUS:{put:async(key,body)=>{stored=new Uint8Array(body);},get:async()=>({arrayBuffer:async()=>corrupt?new Uint8Array([0]).buffer:stored.buffer})}});
+  assert.equal(response.status,corrupt?502:200);
+  assert.deepEqual(stored,bytes);
+ }
+});
 test('checkpoint cleanup retains three complete backups and newer in-flight parts',async()=>{
  const keys=['checkpoints/current.json',...['backup-1','backup-2','backup-3','backup-4'].flatMap(g=>[`checkpoints/${g}/manifest.json`,`checkpoints/${g}/part-0`]),'checkpoints/backup-5/part-0','raw/TZ/authority'];
  const removed=[];

@@ -93,10 +93,14 @@ export default {async fetch(request,env){
  }
  if(path==='/ingest'&&request.method==='POST')return await ingest(request,env);
  if(path==='/index'&&request.method==='PUT'){
-  const {key,data}=await request.json();
+  // Trusted ingestion clients serialize on the ingestion host. Avoid parsing and
+  // reserializing multi-megabyte shards within the Workers Free CPU budget.
+  let key=new URL(request.url).searchParams.get('key'),body;
+  if(key){body=await request.arrayBuffer();}
+  else{const input=await request.json();key=input.key;body=new TextEncoder().encode(JSON.stringify(input.data));}
   if(typeof key!=='string'||!/^search\/[a-zA-Z0-9_-]+\/(TZ|AU|CA|UK|EU)\/[0-9a-f]{2}\.json$/.test(key))return json({error:'Invalid index key'},400);
-  const body=JSON.stringify(data);if(body.length>8*1024*1024)return json({error:'Index shard too large'},413);
-  const digest=await sha(new TextEncoder().encode(body));await env.CORPUS.put(key,body,{httpMetadata:{contentType:'application/json'},customMetadata:{sha256:digest}});
+  if(body.byteLength>8*1024*1024)return json({error:'Index shard too large'},413);
+  const digest=await sha(body);await env.CORPUS.put(key,body,{httpMetadata:{contentType:'application/json'},customMetadata:{sha256:digest}});
   const remote=await env.CORPUS.get(key);if(!remote||await sha(await remote.arrayBuffer())!==digest)return json({error:'Index verification failed'},502);
   return json({verified:true,sha256:digest});
  }

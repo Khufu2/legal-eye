@@ -193,7 +193,10 @@ class Rebuild:
       for term,key,weight in connection.execute('SELECT term,key,weight FROM postings WHERE j=? AND p=? ORDER BY term,weight DESC,key',(j,p)):
        if len(shard[term])<256:shard[term].append([key,weight])
      finally:connection.close()
-     return self.call('/index','PUT',json={'key':f'search/{generation}/{j}/{p:02x}.json','data':shard})
+     body=json.dumps(shard,separators=(',',':'),ensure_ascii=False).encode()
+     receipt=self.call('/index','PUT',params={'key':f'search/{generation}/{j}/{p:02x}.json'},content=body)
+     if not receipt.get('verified') or receipt.get('sha256')!=digest(body):raise ValueError('Index shard remote verification mismatch')
+     return receipt
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(upload,range(256)))
     self.call('/seal',json={'generation':generation,'jurisdiction':j})
   if not counts:raise RuntimeError('No verified documents to publish')

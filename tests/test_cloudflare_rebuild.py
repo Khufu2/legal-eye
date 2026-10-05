@@ -22,7 +22,12 @@ class CloudflareRebuildTests(unittest.TestCase):
     doc={'title':'Employment' if n==259 else 'General provision','citation':None,'chunks':[{'content':'Employment notice'}],'jurisdiction_code':'TZ'}
     runner.db.execute('INSERT INTO documents VALUES (?,?,?,?,?,?,?,?)',(str(n),'TZ',str(n),'hash','documents/'+str(n),doc['title'],1,json.dumps(doc)))
    runner.db.commit();calls=[]
-   runner.call=lambda path,method='POST',**kwargs:calls.append((path,kwargs.get('json'))) or {'verified':True}
+   def call(path,method='POST',**kwargs):
+    body=kwargs.get('json')
+    if path=='/index':body={'key':kwargs['params']['key'],'data':json.loads(kwargs['content'])}
+    calls.append((path,body))
+    return {'verified':True,'sha256':module.digest(kwargs.get('content',b''))}
+   runner.call=call
    runner.publish()
    manifest=next(body for path,body in calls if path=='/publish')
    self.assertEqual(manifest['documents'],260);self.assertEqual(manifest['counts'],{'TZ':260})

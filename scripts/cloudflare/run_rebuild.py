@@ -21,16 +21,21 @@ def rebuild(j):
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
  futures=[pool.submit(rebuild,j) for j in ['TZ','CA','AU','UK','EU']]
- last_publish=time.monotonic();last_checkpoint=last_publish-240
+ started=time.monotonic()
+ due={'checkpoint':started+60,'publish':started+900}
+ failures={'checkpoint':0,'publish':0}
  while any(not future.done() for future in futures):
   time.sleep(15)
-  try:
-   if time.monotonic()-last_checkpoint>=300:
-    runner.checkpoint();last_checkpoint=time.monotonic()
-   if time.monotonic()-last_publish>=900:
-    runner.publish();last_publish=time.monotonic()
-  except Exception as error:
-   print(json.dumps({'maintenance_failed':type(error).__name__,'message':str(error)[:150]}),flush=True)
+  for operation,interval in [('checkpoint',300),('publish',900)]:
+   if time.monotonic()<due[operation]:continue
+   try:
+    getattr(runner,operation)();failures[operation]=0
+    due[operation]=time.monotonic()+interval
+   except Exception as error:
+    failures[operation]+=1
+    retry_after=min(1800,60*2**min(failures[operation]-1,5))
+    due[operation]=time.monotonic()+retry_after
+    print(json.dumps({'operation':operation,'maintenance_failed':type(error).__name__,'message':str(error)[:150],'retry_after_seconds':retry_after}),flush=True)
  for future in futures:print(json.dumps(future.result()),flush=True)
 runner.checkpoint();runner.publish()
 with runner.lock:
