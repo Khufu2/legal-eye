@@ -3,7 +3,10 @@ import {legalModelName} from './model.ts';
 export type SearchEvidence={content?:string;title?:string;[key:string]:unknown};
 export function retrievalQuery(value:string){
  if(/-----BEGIN .*PRIVATE KEY-----|\b(?:sk|rk)-[A-Za-z0-9_-]{20,}|\bAIza[0-9A-Za-z_-]{20,}|\bAKIA[0-9A-Z]{16}\b/.test(value))throw new Error('Remove credential-like material before searching.');
- return value.replace(/\b(?:passport|national id|ssn|tin)\s*(?:number|no\.?|#)?\s*[:=-]\s*[A-Z0-9-]{5,24}\b/gi,'[REDACTED_ID]');
+ return value.replace(/\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g,'[REDACTED_FINANCIAL_IDENTIFIER]').replace(/\b(?:passport|national id|ssn|tin)\s*(?:number|no\.?|#)?\s*[:=-]\s*[A-Z0-9-]{5,24}\b/gi,'[REDACTED_ID]');
+}
+export function embeddingInputs(question:string,rows:SearchEvidence[]){
+ return [retrievalQuery(question),...rows.slice(0,32).map(row=>retrievalQuery(`${row.title||''}\n${row.content||''}`).slice(0,6000))];
 }
 /** Query expansion creates search terms only; its output is never legal evidence. */
 export async function conceptualSearchQuery(question:string){
@@ -19,7 +22,7 @@ export function fuseSemanticRanking<T extends SearchEvidence>(rows:T[],vectors:n
 }
 export async function rerankEvidence<T extends SearchEvidence>(question:string,rows:T[]){
  if(!rows.length)return {evidence:rows,method:'no-evidence'};
- try{const {embeddings}=await embedMany({model:gateway.embeddingModel(process.env.LEGAL_EYE_EMBEDDING_MODEL?.trim()||'google/gemini-embedding-001'),values:[retrievalQuery(question),...rows.slice(0,32).map(row=>`${row.title||''}\n${row.content||''}`.slice(0,6000))],maxRetries:0,abortSignal:AbortSignal.timeout(12000)});
+ try{const {embeddings}=await embedMany({model:gateway.embeddingModel(process.env.LEGAL_EYE_EMBEDDING_MODEL?.trim()||'google/gemini-embedding-001'),values:embeddingInputs(question,rows),maxRetries:0,abortSignal:AbortSignal.timeout(12000)});
  return {evidence:fuseSemanticRanking(rows.slice(0,32),embeddings),method:'lexical+embedding-rerank'};
  }catch(error){console.warn('Semantic reranking fallback',error instanceof Error?error.name:'unknown');return {evidence:rows,method:'lexical-fallback'};}
 }

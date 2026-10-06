@@ -51,6 +51,8 @@ Use `LAWYER-PILOT-GUIDE.md` for supervised fictional/de-identified evaluation af
 
 ## Feature release update
 
-Commits `bb4e820`, `67a32dc` and `4a4a8c5` added the features above. Vercel production deployment `dpl_8UwTQfdvLex7vAjK492y98JodFZh` is READY. The source Worker and ten-minute cron are active. All **40 Node regression tests** passed, app TypeScript passed, and the source monitor browser showed the priority coverage and recorded checks. Synthetic live API checks verified OCR metadata and private search, embedding reranking, durable approvals, replay guard, cancellation and revoked-membership rejection. These tests do not replace email onboarding, authenticated browser acceptance or lawyer accuracy/currentness assessment.
+Commits `bb4e820`, `67a32dc` and `4a4a8c5` added the features above. Vercel production deployment `dpl_8UwTQfdvLex7vAjK492y98JodFZh` is READY. The source Worker and ten-minute cron are active. All **41 Node regression tests** passed, app TypeScript passed, and the source monitor browser showed the priority coverage and recorded checks. Synthetic live API checks verified OCR metadata and private search, embedding reranking, durable approvals, replay guard, cancellation and revoked-membership rejection. These tests do not replace email onboarding, authenticated browser acceptance or lawyer accuracy/currentness assessment.
 
 Email setup remains an external configuration gate: the replacement project's SMTP credentials and verified sender have not been supplied or saved. No user verification settings were weakened. Do not describe this update as Harvey/Legora parity or all-law coverage.
+
+Private embedding inputs now pass credential detection and government/financial identifier redaction before any embedding request. The disposable scan files, fixture workspace and Auth account used for live checks were deleted after scoped cleanup; no existing account or firm data was removed.
