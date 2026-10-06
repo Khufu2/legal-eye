@@ -1,7 +1,15 @@
 {
-  "checked_at": "2026-10-06T18:47:23.096962+00:00",
+  "checked_at": "2026-10-06T18:52:55.436718+00:00",
   "jurisdiction": "TZ",
   "scope": "OAG published downloadable catalogue only",
+  "source_recoveries": [
+    {
+      "external_id": "oag:parliamentary_resolutions:19",
+      "source_url": "https://www.parliament.go.tz/uploads/documents/sw-1738920470-1569484644-AZIMIO%20LA%20MARRAKESH.pdf",
+      "citation": "Resolution 09/2019",
+      "note": "OAG PDF returns 404. Exact resolution title and adoption date matched to official Parliament PDF; treaty annex retained."
+    }
+  ],
   "collections": [
     {
       "collection": "acts",
@@ -67,10 +75,8 @@
       "collection": "parliamentary_resolutions",
       "source_records": 26,
       "published_downloadable": 26,
-      "verified_indexed": 25,
-      "missing_ids": [
-        "oag:parliamentary_resolutions:19"
-      ],
+      "verified_indexed": 26,
+      "missing_ids": [],
       "no_download_ids": [],
       "unpublished": 0,
       "state": "reconciled"
@@ -86,16 +92,8 @@
       "state": "reconciled"
     }
   ],
-  "catalogue_complete": false,
+  "catalogue_complete": true,
   "all_law_complete": false,
   "judgment_coverage_verified": false,
-  "amendment_effect_verified": false,
-  "source_failures": [
-    {
-      "external_id": "oag:parliamentary_resolutions:19",
-      "status": 404,
-      "canonical_url": "https://oagmis.oag.go.tz/portal/specific-resolutions/19",
-      "reason": "Official PDF unavailable; normalized and original double-slash source paths both return 404."
-    }
-  ]
+  "amendment_effect_verified": false
 }

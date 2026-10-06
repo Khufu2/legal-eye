@@ -50,3 +50,11 @@ test('search retains distinct issue-bearing passages from the same authority',as
  assert.equal(response.status,200);const {evidence}=await response.json();
  assert.equal(evidence.length,2);assert.ok(evidence.some(hit=>hit.content.includes('fair procedure')));assert.ok(evidence.some(hit=>hit.content.includes('misconduct notice')));
 });
+
+test('the recovered parliamentary resolution carries its actual official source provenance',async()=>{
+ const {provenance}=await import('../scripts/cloudflare/corpus_worker.mjs');
+ const doc={jurisdiction_code:'TZ',external_id:'oag:parliamentary_resolutions:19',source_url:'https://www.parliament.go.tz/uploads/documents/sw-1738920470-1569484644-AZIMIO%20LA%20MARRAKESH.pdf'};
+ assert.equal(provenance(doc).source_name,'Parliament of Tanzania');
+ assert.match(provenance(doc).attribution,/Resolution 09\/2019/);
+ assert.equal(provenance({...doc,source_url:'https://example.org/fake.pdf'}).source_name,'Tanzania Office of the Attorney General');
+});

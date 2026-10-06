@@ -6,6 +6,11 @@ const SOURCES = {
  UK: {host:'www.legislation.gov.uk',name:'UK Legislation',attribution:'Contains public sector information licensed under the Open Government Licence v3.0.'},
  EU: {host:'eur-lex.europa.eu',name:'EUR-Lex',attribution:'Source: EUR-Lex. Excludes protected third-party material.'},
 };
+const PARLIAMENT_RESOLUTION_URL='https://www.parliament.go.tz/uploads/documents/sw-1738920470-1569484644-AZIMIO%20LA%20MARRAKESH.pdf';
+export function provenance(document,source=SOURCES[document.jurisdiction_code]){
+ if(document.jurisdiction_code==='TZ'&&document.external_id==='oag:parliamentary_resolutions:19'&&document.source_url===PARLIAMENT_RESOLUTION_URL)return {source_name:'Parliament of Tanzania',attribution:'Source: Parliament of Tanzania, Resolution 09/2019 adopted 11 September 2019. OAG catalogue PDF unavailable; official Parliament copy.'};
+ return {source_name:source.name,attribution:source.attribution};
+}
 const json=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});
 const sha=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
 export function terms(text){return [...new Set((text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(w=>!['the','and','for','with','from','that','this','shall','which','under','what','does','how','are','law','legal','tanzania','tanzanian','act','section','please'].includes(w)))].slice(0,10);}
@@ -30,7 +35,7 @@ async function ingest(request,env){
  const existing=await env.CORPUS.head(rawKey);
  if(!existing)await env.CORPUS.put(rawKey,bytes,{sha256:hash,httpMetadata:{contentType:raw.type||'application/octet-stream',cacheControl:'private, no-store'},customMetadata:{sha256:hash}});
  const remote=await env.CORPUS.get(rawKey); if(!remote||await sha(await remote.arrayBuffer())!==hash)return json({error:'R2 verification failed'},502);
- const stored={...document,id,raw_r2_key:rawKey,source_name:source.name,attribution:source.attribution,parser_version:document.parser_version||'locke-open-text-v1',indexed_at:new Date().toISOString()};
+ const stored={...document,id,raw_r2_key:rawKey,...provenance(document,source),parser_version:document.parser_version||'locke-open-text-v1',indexed_at:new Date().toISOString()};
  const body=JSON.stringify(stored), bodyHash=await sha(new TextEncoder().encode(body)),docKey=`documents/${id}/${hash}/${bodyHash}.json`;
  await env.CORPUS.put(docKey,body,{httpMetadata:{contentType:'application/json',cacheControl:'private, no-store'},customMetadata:{sha256:bodyHash}});
  const check=await env.CORPUS.get(docKey);if(!check||await sha(await check.arrayBuffer())!==bodyHash)return json({error:'Extracted body verification failed'},502);
@@ -59,7 +64,7 @@ async function ingestExtracted(request,env){
  for(const c of document.chunks)if(typeof c.content!=='string'||!c.content.trim()||c.content.length>12000||!c.source_node_ref)return json({error:'Invalid passage'},400);
  const id=await sha(new TextEncoder().encode(document.jurisdiction_code+':'+document.external_id)),verification=await read(env,`verification/${id}/${document.content_sha256}.json`);
  if(!verification||!await env.CORPUS.head(verification.key))return json({error:'Complete source-byte verification required'},409);
- const stored={...document,id,raw_r2_key:verification.key,source_name:source.name,attribution:source.attribution,indexed_at:new Date().toISOString()};
+ const stored={...document,id,raw_r2_key:verification.key,...provenance(document,source),indexed_at:new Date().toISOString()};
  const body=JSON.stringify(stored),bodyHash=await sha(new TextEncoder().encode(body)),key=`documents/${id}/${document.content_sha256}/${bodyHash}.json`;
  await env.CORPUS.put(key,body,{httpMetadata:{contentType:'application/json',cacheControl:'private, no-store'}});
  const check=await env.CORPUS.get(key);if(!check||await sha(await check.arrayBuffer())!==bodyHash)return json({error:'Extracted body verification failed'},502);
