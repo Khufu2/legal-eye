@@ -2,7 +2,7 @@ type Passage={content?:string;ocr_requires_verification?:unknown};
 const normalize=(value:string)=>value.normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
 /** Accept individual, grouped and page-qualified references without trusting URLs. */
 export function evidenceLabels(text:string):string[]{
- return [...new Set([...text.matchAll(/\[([^\]\n]{1,200})\]/g)].flatMap(group=>[...group[1].matchAll(/\b([PF]\d+)\b/g)].map(match=>match[1])))];
+ return [...new Set([...text.matchAll(/\[[^\]\n]{1,200}\]|\([PF]\d+\b[^)\n]{0,198}\)/g)].flatMap(group=>[...group[0].matchAll(/\b([PF]\d+)\b/g)].map(match=>match[1])))];
 }
 /** Checks evidence references and verbatim text, never the truth or currentness of law. */
 export function auditResearchCitations(answer:string,publicRows:Passage[],privateRows:Passage[]){
