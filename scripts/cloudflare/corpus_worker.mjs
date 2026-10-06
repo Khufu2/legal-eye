@@ -78,8 +78,9 @@ export function validateWatchlist(documents){
 async function publishDelta(request,env){
  const input=await request.json();if(!/^[a-f0-9]{64}$/.test(input.id)||typeof input.document_key!=='string'||!input.document_key.startsWith(`documents/${input.id}/`)||!/^documents\/[a-f0-9]{64}\/[a-f0-9]{64}\/[a-f0-9]{64}\.json$/.test(input.document_key))return json({error:'Invalid verified document key'},400);
  const doc=await read(env,input.document_key);if(!doc||doc.id!==input.id)return json({error:'Verified document not found'},404);
- const frequencies={};for(const word of ((doc.title+' '+doc.chunks.map(c=>c.content).join(' ')).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]))frequencies[word]=(frequencies[word]||0)+1;
- const tokens=Object.fromEntries(Object.entries(frequencies).sort((a,b)=>b[1]-a[1]).slice(0,3000));
+ let tokens;
+ if(input.tokens!==undefined){if(!input.tokens||typeof input.tokens!=='object'||Array.isArray(input.tokens)||Object.keys(input.tokens).length>3000||Object.entries(input.tokens).some(([term,n])=>term.length<3||term.length>100||!Number.isFinite(n)||n<1||n>100000000))return json({error:'Invalid bounded delta tokens'},400);tokens=input.tokens;}
+ else {const frequencies={};for(const word of ((doc.title+' '+doc.chunks.map(c=>c.content).join(' ')).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]))frequencies[word]=(frequencies[word]||0)+1;tokens=Object.fromEntries(Object.entries(frequencies).sort((a,b)=>b[1]-a[1]).slice(0,3000));}
  const entry={id:doc.id,key:input.document_key,jurisdiction:doc.jurisdiction_code,external_id:doc.external_id,title:doc.title,canonical_url:doc.canonical_url,hash:doc.content_sha256,updated_at:new Date().toISOString(),tokens};
  for(let attempt=0;attempt<4;attempt++){const object=await env.CORPUS.get('search/delta.json'),previous=object?await object.json():{documents:[]};const documents=previous.documents.filter(d=>d.id!==entry.id);if(documents.length>=200)return json({error:'Delta index requires a full index reconciliation'},409);documents.push(entry);const next={documents,updated_at:entry.updated_at};const written=await env.CORPUS.put('search/delta.json',JSON.stringify(next),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'application/json'}});if(written)return json({published:true,id:entry.id,currentness_verified:false});}
  return json({error:'Concurrent index publication; retry'},409);
@@ -175,9 +176,15 @@ export default {async scheduled(controller,env,ctx){ctx.waitUntil(refreshTick(en
   const remote=await env.CORPUS.get(key);if(!remote||await sha(await remote.arrayBuffer())!==digest)return json({error:'Index verification failed'},502);
   return json({verified:true,sha256:digest});
  }
+ if(path==='/seal-part'&&request.method==='POST'){
+  const {generation,jurisdiction,part}=await request.json();if(!/^[a-zA-Z0-9_-]+$/.test(generation)||!SOURCES[jurisdiction]||!Number.isInteger(part)||part<0||part>15)return json({error:'Invalid bounded seal part'},400);
+  const keys=Array.from({length:16},(_,i)=>`search/${generation}/${jurisdiction}/${(part*16+i).toString(16).padStart(2,'0')}.json`);
+  const heads=await Promise.all(keys.map(key=>env.CORPUS.head(key)));const missing=heads.findIndex(x=>!x);if(missing!==-1)return json({error:'Incomplete index',key:keys[missing]},409);
+  await env.CORPUS.put(`search/${generation}/${jurisdiction}/seals/${part}.json`,JSON.stringify({verified:true}));return json({verified:true,part});
+ }
  if(path==='/seal'&&request.method==='POST'){
   const {generation,jurisdiction}=await request.json();if(!/^[a-zA-Z0-9_-]+$/.test(generation)||!SOURCES[jurisdiction])return json({error:'Invalid generation'},400);
-  for(let p=0;p<256;p++){const key=`search/${generation}/${jurisdiction}/${p.toString(16).padStart(2,'0')}.json`;if(!await env.CORPUS.head(key))return json({error:'Incomplete index',key},409);}
+  const keys=Array.from({length:16},(_,part)=>`search/${generation}/${jurisdiction}/seals/${part}.json`);const heads=await Promise.all(keys.map(key=>env.CORPUS.head(key)));const missing=heads.findIndex(x=>!x);if(missing!==-1)return json({error:'Incomplete index verification',key:keys[missing]},409);
   await env.CORPUS.put(`search/${generation}/${jurisdiction}/sealed.json`,JSON.stringify({verified:true}));return json({verified:true});
  }
  if(path==='/publish'&&request.method==='POST'){

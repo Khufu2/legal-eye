@@ -58,3 +58,25 @@ test('the recovered parliamentary resolution carries its actual official source 
  assert.match(provenance(doc).attribution,/Resolution 09\/2019/);
  assert.equal(provenance({...doc,source_url:'https://example.org/fake.pdf'}).source_name,'Tanzania Office of the Attorney General');
 });
+
+test('bounded seal verification requires every shard group before publication',async()=>{
+ const keys=new Set();const env={INGEST_TOKEN:'test',CORPUS:{head:async key=>keys.has(key)?{}:null,put:async key=>keys.add(key)}};
+ const request=(path,body)=>new Request('https://example.org'+path,{method:'POST',headers:{authorization:'Bearer test'},body:JSON.stringify(body)});
+ const body={generation:'test',jurisdiction:'TZ'};
+ assert.equal((await worker.fetch(request('/seal',body),env)).status,409);
+ assert.equal((await worker.fetch(request('/seal-part',{...body,part:0}),env)).status,409);
+ for(let p=0;p<256;p++)keys.add(`search/test/TZ/${p.toString(16).padStart(2,'0')}.json`);
+ for(let part=0;part<16;part++)assert.equal((await worker.fetch(request('/seal-part',{...body,part}),env)).status,200);
+ assert.equal((await worker.fetch(request('/seal',body),env)).status,200);
+ assert.ok(keys.has('search/test/TZ/sealed.json'));
+ assert.equal((await worker.fetch(request('/seal-part',{...body,part:16}),env)).status,400);
+});
+
+test('CLI-supplied bounded postings skip source tokenization and reject invalid weights',async()=>{
+ const id='1'.repeat(64),key=`documents/${id}/${'2'.repeat(64)}/${'3'.repeat(64)}.json`;
+ const doc={id,jurisdiction_code:'TZ',title:'Law',get chunks(){throw new Error('Source tokenization must run in the CLI');}};
+ const env={INGEST_TOKEN:'test',CORPUS:{get:async k=>k===key?{json:async()=>doc}:null,put:async()=>({etag:'new'})}};
+ const request=tokens=>new Request('https://example.org/delta-publish',{method:'POST',headers:{authorization:'Bearer test'},body:JSON.stringify({id,document_key:key,tokens})});
+ assert.equal((await worker.fetch(request({employment:12}),env)).status,200);
+ assert.equal((await worker.fetch(request({employment:-1}),env)).status,400);
+});

@@ -35,7 +35,7 @@ class Rebuild:
  def call(self,path,method='POST',**kwargs):
   for attempt in range(3):
    r=self.client.request(method,self.endpoint+path,headers={'authorization':'Bearer '+self.secret},**kwargs)
-   if r.status_code in (429,502,503,504) and attempt<2:time.sleep(1+attempt);continue
+   if (r.status_code in (429,502,503,504) or (path=='/delta-publish' and r.status_code==409)) and attempt<2:time.sleep(1+attempt);continue
    r.raise_for_status();return r.json()
   raise RuntimeError('Gateway unavailable')
  def fetch(self,url,allowed):
@@ -104,12 +104,18 @@ class Rebuild:
    self.db.execute('INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?)',(receipt['id'],doc['jurisdiction_code'],doc['external_id'],doc['content_sha256'],receipt['document_key'],doc['title'],len(chunks),json.dumps(doc,ensure_ascii=False)))
    self.db.commit()
   return receipt
+ def publish_delta(self,receipt):
+  with self.lock:row=self.db.execute('SELECT record FROM documents WHERE id=?',(receipt['id'],)).fetchone()
+  if not row:raise ValueError('Verified local receipt required')
+  doc=json.loads(row[0]);frequencies=collections.Counter(re.findall(r'[^\W_]{3,}',(doc['title']+' '+' '.join(c['content'] for c in doc['chunks'])).lower()))
+  bounded={term:n for term,n in frequencies.most_common(3000) if len(term)<=100}
+  return self.call('/delta-publish',json={'id':receipt['id'],'document_key':receipt.get('document_key') or receipt.get('object_key'),'tokens':bounded})
  def run_one(self,doc,allowed):
   try:
    with self.lock:done=self.db.execute('SELECT title FROM documents WHERE jurisdiction=? AND external_id=?',(doc['jurisdiction_code'],doc['external_id'])).fetchone()
    if done and done[0].strip():return
    raw,mime=self.fetch(doc.get('source_url',doc['canonical_url']),allowed);receipt=self.ingest(doc,raw,mime)
-   if self.delta_publish:self.call('/delta-publish',json={'id':receipt['id'],'document_key':receipt['document_key']})
+   if self.delta_publish:self.publish_delta(receipt)
   except Exception as e:
    with self.lock:self.db.execute('INSERT INTO errors VALUES (?,?,?,?)',(doc['jurisdiction_code'],doc['external_id'],type(e).__name__+': '+str(e)[:160],now()));self.db.commit()
  def batch(self,docs,allowed,workers):
@@ -181,8 +187,8 @@ class Rebuild:
     celex=item['celex']['value'];url='https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:'+quote(celex,safe='');external='celex:'+celex;self.discover('EU',external,item)
     docs.append({'external_id':external,'jurisdiction_code':'EU','title':item.get('title',{}).get('value','EU legal document '+celex),'citation':'CELEX '+celex,'document_type':'eu_legal_act','canonical_url':url,'source_url':'https://publications.europa.eu/resource/celex/'+quote(celex,safe=''),'published_at':item.get('date',{}).get('value')})
    self.batch(docs,{'eur-lex.europa.eu','publications.europa.eu'},workers)
- def publish(self):
-  generation='rebuild-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S');counts={};chunks=0;latest=[]
+ def publish(self,generation=None,jurisdictions=None):
+  generation=generation or 'rebuild-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S');counts={};chunks=0;latest=[]
   with tempfile.TemporaryDirectory() as folder:
    snapshot=sqlite3.connect(str(pathlib.Path(folder)/'snapshot.sqlite'))
    with self.lock:self.db.backup(snapshot)
@@ -190,14 +196,17 @@ class Rebuild:
    index.executescript('PRAGMA journal_mode=OFF; PRAGMA temp_store=FILE; CREATE TABLE postings(j TEXT,p INTEGER,term TEXT,key TEXT,weight REAL);')
    for j,key,title,n,record in snapshot.execute('SELECT jurisdiction,object_key,title,chunk_count,record FROM documents'):
     doc=json.loads(record);counts[j]=counts.get(j,0)+1;chunks+=n
+    latest.append({k:doc.get(k) for k in ['title','citation','canonical_url','jurisdiction_code','document_type','published_at']})
+    latest=sorted(latest,key=lambda d:str(d.get('published_at') or ''),reverse=True)[:12]
+    if jurisdictions and j not in jurisdictions:continue
     body=collections.Counter()
     for chunk in doc['chunks']:body.update(tokens(chunk['content']))
     titles=collections.Counter(tokens(title+' '+str(doc.get('citation') or '')))
     index.executemany('INSERT INTO postings VALUES (?,?,?,?,?)',((j,int(prefix(term),16),term,key,round(math.log1p(body[term])+titles[term]*15,3)) for term in body.keys()|titles.keys()))
-    latest.append({k:doc.get(k) for k in ['title','citation','canonical_url','jurisdiction_code','document_type','published_at']})
-    latest=sorted(latest,key=lambda d:str(d.get('published_at') or ''),reverse=True)[:12]
+
    snapshot.close();index.execute('CREATE INDEX lookup ON postings(j,p,term,weight DESC,key)');index.commit();index.close()
    for j in sorted(counts):
+    if jurisdictions and j not in jurisdictions:continue
     def upload(p):
      connection=sqlite3.connect(index_path);shard=collections.defaultdict(list)
      try:
@@ -209,9 +218,10 @@ class Rebuild:
      if not receipt.get('verified') or receipt.get('sha256')!=digest(body):raise ValueError('Index shard remote verification mismatch')
      return receipt
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(upload,range(256)))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:list(pool.map(lambda part:self.call('/seal-part',json={'generation':generation,'jurisdiction':j,'part':part}),range(16)))
     self.call('/seal',json={'generation':generation,'jurisdiction':j})
   if not counts:raise RuntimeError('No verified documents to publish')
-  manifest={'generation':generation,'as_of':now(),'jurisdictions':sorted(counts),'documents':sum(counts.values()),'chunks':chunks,'counts':counts,'latest':latest,'coverage':'Rebuild in progress; source reconciliation required','index':'lexical title/content postings, bounded to 256 documents per term'}
+  manifest={'generation':generation,'as_of':now(),'jurisdictions':sorted(counts),'documents':sum(counts.values()),'chunks':chunks,'counts':counts,'latest':latest,'coverage':'Declared source snapshots; consult separate coverage assessment. Court coverage and legal currentness require verification.','index':'lexical title/content postings, bounded to 256 documents per term'}
   print(json.dumps(self.call('/publish',json=manifest)),flush=True)
 
  def checkpoint(self):

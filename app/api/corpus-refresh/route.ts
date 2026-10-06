@@ -1,6 +1,7 @@
 import {createHash,timingSafeEqual} from 'node:crypto';
 import {extractText,getDocumentProxy} from 'unpdf';
 import {z} from 'zod';
+import {buildDeltaTokens} from '@/lib/legal/corpus-index';
 export const maxDuration=60;
 const schema=z.object({external_id:z.string().min(1).max(200),jurisdiction_code:z.literal('TZ'),title:z.string().max(500),citation:z.string().nullable().optional(),document_type:z.string().max(80),canonical_url:z.string().url(),source_url:z.string().url(),content_sha256:z.string().regex(/^[a-f0-9]{64}$/),published_at:z.string().nullable().optional()});
 const allowed=(value:string)=>{const url=new URL(value);if(url.protocol!=='https:'||url.hostname!=='oagmis.oag.go.tz'||url.username||url.password||url.port)throw new Error('Unapproved source URL');return url.href;};
@@ -24,7 +25,8 @@ export async function POST(request:Request){
  const document={...doc,content_sha256:hash,chunks,retrieved_at:new Date().toISOString(),parser_version:'unpdf-source-refresh-v1',version_notice:'Source file changed; legal effect, amendments and currentness require lawyer verification.'};
  const form=new FormData();form.set('raw',new Blob([bytes],{type:'application/pdf'}),'source.pdf');form.set('document',JSON.stringify(document));
  const headers={authorization:`Bearer ${secret}`};const ingested=await fetch(`${url}/ingest`,{method:'POST',headers,body:form,signal:AbortSignal.timeout(15000)});if(!ingested.ok)throw new Error('Verified source storage failed');const receipt=await ingested.json();
- const published=await fetch(`${url}/delta-publish`,{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({id:receipt.id,document_key:receipt.document_key}),signal:AbortSignal.timeout(15000)});if(!published.ok)throw new Error('Source stored; search publication requires retry');
+ const tokens=buildDeltaTokens(doc.title+' '+chunks.map(c=>c.content).join(' '));
+ const published=await fetch(`${url}/delta-publish`,{method:'POST',headers:{...headers,'content-type':'application/json'},body:JSON.stringify({id:receipt.id,document_key:receipt.document_key,tokens}),signal:AbortSignal.timeout(15000)});if(!published.ok)throw new Error('Source stored; search publication requires retry');
  return Response.json({state:'updated',content_sha256:hash,document_key:receipt.document_key,chunks:chunks.length,currentness_verified:false});
  }catch(error){return Response.json({error:error instanceof Error?error.message:'Source refresh failed'},{status:422});}
 }
