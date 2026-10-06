@@ -1,0 +1,101 @@
+{
+  "checked_at": "2026-10-06T18:47:23.096962+00:00",
+  "jurisdiction": "TZ",
+  "scope": "OAG published downloadable catalogue only",
+  "collections": [
+    {
+      "collection": "acts",
+      "source_records": 321,
+      "published_downloadable": 321,
+      "verified_indexed": 321,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "revised_acts",
+      "source_records": 541,
+      "published_downloadable": 541,
+      "verified_indexed": 541,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "subsidiary_legislation",
+      "source_records": 4552,
+      "published_downloadable": 4552,
+      "verified_indexed": 4552,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "annual_supplements",
+      "source_records": 51,
+      "published_downloadable": 51,
+      "verified_indexed": 51,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "bills",
+      "source_records": 126,
+      "published_downloadable": 126,
+      "verified_indexed": 126,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "guidelines",
+      "source_records": 4,
+      "published_downloadable": 4,
+      "verified_indexed": 4,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "parliamentary_resolutions",
+      "source_records": 26,
+      "published_downloadable": 26,
+      "verified_indexed": 25,
+      "missing_ids": [
+        "oag:parliamentary_resolutions:19"
+      ],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    },
+    {
+      "collection": "international_instruments",
+      "source_records": 0,
+      "published_downloadable": 0,
+      "verified_indexed": 0,
+      "missing_ids": [],
+      "no_download_ids": [],
+      "unpublished": 0,
+      "state": "reconciled"
+    }
+  ],
+  "catalogue_complete": false,
+  "all_law_complete": false,
+  "judgment_coverage_verified": false,
+  "amendment_effect_verified": false,
+  "source_failures": [
+    {
+      "external_id": "oag:parliamentary_resolutions:19",
+      "status": 404,
+      "canonical_url": "https://oagmis.oag.go.tz/portal/specific-resolutions/19",
+      "reason": "Official PDF unavailable; normalized and original double-slash source paths both return 404."
+    }
+  ]
+}

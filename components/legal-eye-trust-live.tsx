@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { LiveIdentity } from "@/components/legal-eye-live";
+import { CorpusCoverage } from "@/components/corpus-coverage";
 import { FirmCitator } from "@/components/firm-citator";
 import { WorkspaceTeam } from "@/components/workspace-team";
 import { IntelligenceGuide } from "@/components/intelligence-guide";
@@ -27,6 +28,7 @@ export function TrustLive({identity,connect}:{identity:LiveIdentity|null;connect
    {title:"Inspect firm activity",detail:"Use the audit trail to see material workspace mutations and actors."},
    {title:"Export evidence",detail:"Download the current audit and governance snapshot for internal review."},
  ]}/>
+ <CorpusCoverage/>
  <WorkspaceTeam identity={identity}/>
  <FirmCitator key={identity.organization_id} identity={identity}/>
  {syncs.some(c=>c.cursor.access_blocked||c.consecutive_failures>0)&&<div className="workspace-tip" role="status"><TriangleAlert/><span><b>Corpus coverage has gaps.</b> Some enabled sources are blocked or retrying. Check each source below before relying on coverage or freshness.</span></div>}
