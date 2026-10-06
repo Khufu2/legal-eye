@@ -79,12 +79,11 @@ type HomeProps = { identity: Identity | null; go: (question: string) => void; na
 export function ResearchHome({ identity, go, navigate, openSession, jurisdictions, setJurisdictions, privateContext, setPrivateContext }: HomeProps) {
   const [question, setQuestion] = useState(""), [filters, setFilters] = useState(false), [recent, setRecent] = useState<Session[]>([]);
   useEffect(() => { if (!identity) return setRecent([]); void workspace<Session[]>(identity, `research_sessions?select=id,title,updated_at&organization_id=eq.${identity.organization_id}&order=updated_at.desc&limit=6`).then(setRecent).catch(() => undefined); }, [identity]);
-  const scrollToCapabilities = () => document.getElementById("locke-capabilities")?.scrollIntoView({ behavior: "smooth", block: "start" });
   return <div className="cathedral-home">
-    <section className="home-hero">
-      <div className="home-hero-core">
-        <div className="home-hero-brand"><LockeMark/><span>LOCKE</span></div>
-        <h1>Legal research starts here</h1>
+    <section className="home-hero"><div className="home-hero-core">
+      <div className="home-hero-brand"><ShieldCheck size={16}/><span>Your legal workspace</span></div>
+      <h1>What are we working on?</h1>
+      <p className="home-subtitle">Research authority. Review agreements. Build work you can stand behind.</p>
         <form className="home-composer" onSubmit={e => { e.preventDefault(); go(question); }}>
           <label className="sr-only" htmlFor="legal-question">Ask a legal question</label>
           <textarea id="legal-question" placeholder="Ask a legal question…" value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(question); } }}/>
@@ -99,43 +98,18 @@ export function ResearchHome({ identity, go, navigate, openSession, jurisdiction
           {filters && <div className="jurisdiction-picker"><span>Research jurisdictions</span>{JURISDICTIONS.map(([code, name]) => <label key={code}><input type="checkbox" checked={jurisdictions.includes(code)} onChange={e => setJurisdictions(e.target.checked ? [...jurisdictions, code] : jurisdictions.filter(j => j !== code).length ? jurisdictions.filter(j => j !== code) : [code])}/>{name}</label>)}<p>Coverage varies by source. Answers identify gaps in the retrieved evidence.</p></div>}
         </form>
         <div className="question-examples">{["Find controlling Tanzanian authority", "Compare directors’ duties: TZ vs UK", "Review a confidentiality clause"].map(q => <button key={q} onClick={() => setQuestion(q)}>{q}</button>)}</div>
-      </div>
-      <button className="home-scroll-cue" type="button" onClick={scrollToCapabilities} aria-label="Explore LOCKE capabilities">
-        <span/>
-        <b>Built for legal work</b>
-        <ChevronDown size={15}/>
-        <span/>
-      </button>
+    </div></section>
+    <div className="desk-heading"><h2>Start with a task</h2><span>From evidence to work product</span></div>
+    <div className="desk-cards">{[
+      {view:"review",title:"Review an agreement",detail:"Find risks and inspect the original clauses.",Icon:ShieldCheck},
+      {view:"draft",title:"Draft a document",detail:"Write, refine and save a versioned work product.",Icon:FileText},
+      {view:"tables",title:"Compare documents",detail:"Extract key terms into a sourced comparison.",Icon:BookOpen},
+      {view:"workflows",title:"Run a firm process",detail:"Reuse a workflow with lawyer checkpoints.",Icon:Clock3},
+    ].map(({view,title,detail,Icon})=><button className="desk-card" key={view} onClick={()=>navigate(view)}><Icon/><b>{title}</b><p>{detail}</p><ArrowUpRight/></button>)}</div>
+    <section className="desk-continue"><div className="desk-heading"><h2>Continue your research</h2><span>Saved to your firm</span></div>
+      {recent.length ? <div className="recent-research">{recent.map(r => <button key={r.id} onClick={() => openSession(r.id)}><MessageSquareText size={16}/><b>{r.title}</b><time>{new Date(r.updated_at).toLocaleDateString()}</time><ArrowUpRight size={14}/></button>)}</div> : <p className="home-empty">{identity ? "Start a question above. Your saved research will appear here." : "Sign in to save research and work with private firm documents."}</p>}
     </section>
-
-    <section id="locke-capabilities" className="home-guide" aria-label="How to use LOCKE">
-      <div className="home-guide-title"><span>From authority to work product</span></div>
-      <article className="home-feature">
-        <div className="home-feature-copy"><Search/><div><h3>Research with source evidence</h3><p>Ask a legal question, choose the jurisdictions that matter, and inspect the exact passages behind the answer.</p></div></div>
-        <div className="home-feature-actions">{["What makes an employment termination unfair in Tanzania?","Compare directors’ duties in Tanzania and the UK.","What remedies follow from an unfair termination?"].map(q=><button key={q} onClick={()=>{setQuestion(q);window.scrollTo({top:0,behavior:"smooth"})}}>{q}<ArrowUpRight size={15}/></button>)}</div>
-      </article>
-      <article className="home-feature">
-        <div className="home-feature-copy"><FileText/><div><h3>Work with private documents</h3><p>Upload firm documents in Vault, wait until they are Ready, then use them in Review, Tables, Skills or Agent.</p></div></div>
-        <div className="home-feature-actions"><button onClick={()=>navigate("vault")}>Upload or open private documents <ArrowUpRight size={15}/></button><button onClick={()=>navigate("review")}>Review an agreement <ArrowUpRight size={15}/></button></div>
-      </article>
-      <article className="home-feature">
-        <div className="home-feature-copy"><BookOpen/><div><h3>Draft, compare and organise legal work</h3><p>Move research into the editor, compare documents in structured tables, and keep work grouped inside matters.</p></div></div>
-        <div className="home-feature-actions"><button onClick={()=>navigate("draft")}>Open editor <ArrowUpRight size={15}/></button><button onClick={()=>navigate("tables")}>Compare documents <ArrowUpRight size={15}/></button><button onClick={()=>navigate("matters")}>Open matters <ArrowUpRight size={15}/></button></div>
-      </article>
-      <article className="home-feature">
-        <div className="home-feature-copy"><ShieldCheck/><div><h3>Keep firm knowledge governed</h3><p>Private documents are permission-filtered before retrieval, with source evidence and lawyer checkpoints kept visible.</p></div></div>
-        <div className="home-feature-actions"><button onClick={()=>navigate("trust")}>Open Trust <ArrowUpRight size={15}/></button><button onClick={()=>navigate("portal")}>Open client portal <ArrowUpRight size={15}/></button></div>
-      </article>
-      <article className="home-feature">
-        <div className="home-feature-copy"><Check/><div><h3>Automate repeatable legal work</h3><p>Reuse firm instructions with Skills, connect steps in Workflows, run Agent tasks, and monitor source changes.</p></div></div>
-        <div className="home-feature-actions"><button onClick={()=>navigate("skills")}>Skills <ArrowUpRight size={15}/></button><button onClick={()=>navigate("workflows")}>Workflows <ArrowUpRight size={15}/></button><button onClick={()=>navigate("agent")}>Agent <ArrowUpRight size={15}/></button><button onClick={()=>navigate("monitor")}>Monitor <ArrowUpRight size={15}/></button></div>
-      </article>
-    </section>
-
-    <section className="home-work home-recent">
-      <div className="home-guide-title"><span>Continue working</span></div>
-      {recent.length ? <div className="recent-research">{recent.map(r => <button key={r.id} onClick={() => openSession(r.id)}><MessageSquareText size={18}/><b>{r.title}</b><time>{new Date(r.updated_at).toLocaleDateString()}</time><ArrowUpRight size={16}/></button>)}</div> : <p className="home-empty">{identity ? "Your saved research will appear here." : "Sign in to save research, organise matters, and work with private documents."}</p>}
-    </section>
+    <div className="desk-integrations"><a href="/?view=vault"><FileText size={14}/> Private document vault <ArrowUpRight size={12}/></a><a href="/office/word">LOCKE for Word <ArrowUpRight size={12}/></a><a href="/office/outlook">LOCKE for Outlook <ArrowUpRight size={12}/></a><a href="/?view=trust"><ShieldCheck size={14}/> Sources and governance <ArrowUpRight size={12}/></a></div>
   </div>;
 }
 export function LockeMark() { return <svg viewBox="0 0 32 32" width="28" height="28" fill="none" aria-hidden="true"><rect x="4.5" y="4.5" width="23" height="23" rx="6.5" stroke="currentColor" strokeWidth="1.4"/><path d="M11 9.5V22H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
