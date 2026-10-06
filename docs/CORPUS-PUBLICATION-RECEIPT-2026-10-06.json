@@ -1,0 +1,29 @@
+{
+  "checked_at": "2026-10-06T19:08:57.246536+00:00",
+  "manifest": {
+    "generation": "rebuild-20261006T184626",
+    "as_of": "2026-10-06T19:05:24.828556+00:00",
+    "documents": 47406,
+    "chunks": 470680,
+    "counts": {
+      "TZ": 5621,
+      "CA": 5861,
+      "UK": 1340,
+      "EU": 1337,
+      "AU": 33247
+    },
+    "coverage": "OAG declared downloadable catalogue reconciled; other jurisdiction snapshots remain partial. Court coverage and legal currentness require verification."
+  },
+  "catalogue_complete": true,
+  "all_law_complete": false,
+  "checkpoint": {
+    "generation": "backup-20261006T190526",
+    "parts": 27,
+    "sha256": "003830d69fe8ed30baab71ba75c31c46f0a7255945b84531c77adfd80a06e8b2",
+    "compressed_bytes": 225892354,
+    "each_part_hash_verified_on_upload": true
+  },
+  "repaired_delta_documents_published": 60,
+  "native_office_acceptance": "pending Microsoft sign-in",
+  "verified_citator_entries": 0
+}
