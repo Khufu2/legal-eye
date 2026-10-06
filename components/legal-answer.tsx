@@ -1,10 +1,12 @@
 "use client";
 import { Fragment } from "react";
+import { evidenceLabels } from "@/lib/legal/citation-audit";
 
 /** Render model text without trusting generated HTML or generated source URLs. */
 export function LegalAnswer({ text, onCitation }: { text: string; onCitation?: (label: string) => void }) {
-  const inline = (line: string) => line.split(/(\[(?:P|F)\d+\]|\*\*[^*]+\*\*)/g).map((part, index) => {
-    if (/^\[(P|F)\d+\]$/.test(part)) return <button key={index} className="evidence-link" onClick={() => onCitation?.(part.slice(1, -1))} aria-label={`Open source ${part.slice(1, -1)}`}>{part.slice(1, -1)}</button>;
+  const inline = (line: string) => line.split(/(\[[^\]\n]{1,200}\]|\*\*[^*]+\*\*)/g).map((part, index) => {
+    const labels = evidenceLabels(part);
+    if (labels.length) return <Fragment key={index}>{part.slice(1,-1).split(/(\b[PF]\d+\b)/g).map((value,i)=>labels.includes(value)?<button key={i} className="evidence-link" onClick={() => onCitation?.(value)} aria-label={`Open source ${value}`}>{value}</button>:<Fragment key={i}>{value}</Fragment>)}</Fragment>;
     if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
     return <Fragment key={index}>{part}</Fragment>;
   });

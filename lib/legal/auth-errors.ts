@@ -47,7 +47,7 @@ export function authErrorMessage(error: unknown, status?: number): string {
     if (reasons.includes("length")) return "Password is too short for the account security policy. Use a longer password (at least 12 characters).";
     if (reasons.includes("characters")) return "Password needs the character types required by the account security policy. Include upper- and lowercase letters, a number and a symbol.";
   }
-  if (messages[code]) return messages[code];
+  if (Object.hasOwn(messages,code)) return messages[code];
   if (status === 429) return messages.over_request_rate_limit;
   if (status && status >= 500) return "The account service could not complete this request. Try again shortly; contact LOCKE support if it continues.";
   // Never expose backend SQL, tokens or untrusted server messages in the UI.

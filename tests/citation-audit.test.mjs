@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditResearchCitations} from '../lib/legal/citation-audit.ts';
+import {auditResearchCitations,evidenceLabels} from '../lib/legal/citation-audit.ts';
+test('grouped and page-qualified citations remain inspectable and unknown labels still fail',()=>{
+ assert.deepEqual(evidenceLabels('Rule [P1, P2, F1]. Other [P1 Page 38].'),['P1','P2','F1']);
+ const good=auditResearchCitations('Rule [P1, P2].',[{content:'Rule'},{content:'Rule'}],[]);
+ assert.equal(good.passed,true);assert.equal(good.warnings.length,0);
+ const bad=auditResearchCitations('Rule [P1, P99 Page 3].',[{content:'Rule'}],[]);
+ assert.deepEqual(bad.unknownLabels,['P99']);assert.equal(bad.passed,false);
+});
 test('unknown authority labels fail without treating a known label as legal verification',()=>{
  const audit=auditResearchCitations('The rule applies [P1], and another rule [P99].',[{content:'A rule.'}],[]);
  assert.deepEqual(audit.unknownLabels,['P99']);assert.equal(audit.passed,false);assert.equal(audit.currentnessVerified,false);

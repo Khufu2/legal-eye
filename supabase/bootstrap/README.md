@@ -13,3 +13,5 @@ For catalogue monitoring, run `scripts/cloudflare/catalog_metadata.py` against t
 The historical migrations are retained for reproducibility. Their nominal timestamps precede the newly reconstructed foundation; always use the order above on a fresh project. No live user data or credentials are included in these files.
 
 Apply `007_firm_citator.sql` and `008_citator_lookup.sql` for the judgment-evidence workflow and permission-scoped research lookup. `tests/citator-rls.sql` runs disposable transactional assertions and rolls back every fixture. This is a firm-reviewed evidence system, not a complete external good-law citator.
+
+Apply `009_research_session_completion.sql` and `010_review_and_checklist_fields.sql` for research completion, reviewer details and checklist source links. `tests/checklist-source-rls.sql` verifies same-firm acceptance and cross-firm rejection inside a rolled-back transaction.

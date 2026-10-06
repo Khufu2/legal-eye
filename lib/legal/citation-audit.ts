@@ -1,9 +1,13 @@
 type Passage={content?:string;ocr_requires_verification?:unknown};
 const normalize=(value:string)=>value.normalize('NFKC').toLowerCase().replace(/\s+/g,' ').trim();
+/** Accept individual, grouped and page-qualified references without trusting URLs. */
+export function evidenceLabels(text:string):string[]{
+ return [...new Set([...text.matchAll(/\[([^\]\n]{1,200})\]/g)].flatMap(group=>[...group[1].matchAll(/\b([PF]\d+)\b/g)].map(match=>match[1])))];
+}
 /** Checks evidence references and verbatim text, never the truth or currentness of law. */
 export function auditResearchCitations(answer:string,publicRows:Passage[],privateRows:Passage[]){
  const sources=new Map<string,Passage>([...publicRows.map((row,i)=>[`P${i+1}`,row] as const),...privateRows.map((row,i)=>[`F${i+1}`,row] as const)]);
- const labels=[...new Set([...answer.matchAll(/\[([PF]\d+)\]/g)].map(match=>match[1]))];
+ const labels=evidenceLabels(answer);
  const unknownLabels=labels.filter(label=>!sources.has(label));
  const passages=[...sources.values()].map(row=>normalize(row.content||''));
  const unmatchedQuotes=[...answer.matchAll(/[“"]([^”"\n]{30,})[”"]/g)].map(match=>match[1]).filter(quote=>!passages.some(text=>text.includes(normalize(quote))));

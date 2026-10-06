@@ -1,0 +1,11 @@
+LOCKE TECHNICAL ACCEPTANCE — FICTIONAL SERVICES AGREEMENT
+This document is synthetic software test data. It is not a client document or legal advice.
+
+1. Parties: Sample Practice Ltd and Example Client Ltd.
+2. Services: The supplier will prepare a sample research memorandum by 15 October 2026.
+3. Fees: The client will pay TZS 500,000 within 30 days after receipt of an invoice.
+4. Confidentiality: Each party must keep the other party's confidential information private. This obligation continues for 24 months after termination.
+5. Liability: The supplier's liability is unlimited for every loss, including indirect loss.
+6. Termination: Either party may terminate the agreement on 14 days' written notice.
+7. Governing law: The agreement is governed by the laws of Tanzania. Any dispute will be referred to the competent courts in Tanzania.
+8. Notices: All notices must be in writing and delivered to the nominated contact.

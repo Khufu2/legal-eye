@@ -60,7 +60,7 @@ function VaultView({identity,documents,connect,refresh}:{identity:WorkspaceIdent
   const deleteDocument=async(id:string,title:string)=>{if(!identity)return;if(!["owner","admin","partner"].includes(identity.role)){toast.error("Only an owner, admin, or partner can permanently delete vault files.");return;}if(!window.confirm(`Permanently delete "${title}"? This removes the stored file, processed text, reviews and linked extraction rows. This cannot be undone.`))return;try{const response=await fetch(`/api/private-document/${encodeURIComponent(id)}`,{method:"DELETE",headers:{Authorization:`Bearer ${identity.access_token}`}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Document could not be deleted");toast.success("Document permanently deleted");refresh();}catch(e){toast.error(e instanceof Error?e.message:"Document could not be deleted");}};
   const upload=async(file?:File)=>{
     if(!file)return;
-    if(file.size>50000000){toast.error("Choose a document under 50 MB.");return;}
+    if(file.size>20_971_520){toast.error("Choose a document under 20 MB.");return;}
     if(!identity){connect();toast("Sign in to your organization before uploading.");return;}
     setUploadError("");setUploading(true);
     try{
