@@ -36,6 +36,26 @@ async function ingest(request,env){
  const check=await env.CORPUS.get(docKey);if(!check||await sha(await check.arrayBuffer())!==bodyHash)return json({error:'Extracted body verification failed'},502);
  return json({id,document_key:docKey,content_sha256:hash,extracted_sha256:bodyHash,bytes:raw.size,chunks:document.chunks.length,verified:true});
 }
+export function validateWatchlist(documents){
+ if(!Array.isArray(documents)||!documents.length||documents.length>100)throw new Error('Watchlist must contain 1 to 100 priority sources');
+ for(const doc of documents){for(const field of ['canonical_url','source_url']){const url=new URL(doc[field]);if(doc.jurisdiction_code!=='TZ'||url.protocol!=='https:'||url.hostname!==SOURCES.TZ.host||url.username||url.password||url.port)throw new Error('Unapproved watchlist source');}if(!/^[a-f0-9]{64}$/.test(doc.content_sha256)||typeof doc.external_id!=='string'||!doc.title)throw new Error('Invalid watchlist metadata');}
+ return documents;
+}
+async function publishDelta(request,env){
+ const input=await request.json();if(!/^[a-f0-9]{64}$/.test(input.id)||typeof input.document_key!=='string'||!input.document_key.startsWith(`documents/${input.id}/`)||!/^documents\/[a-f0-9]{64}\/[a-f0-9]{64}\/[a-f0-9]{64}\.json$/.test(input.document_key))return json({error:'Invalid verified document key'},400);
+ const doc=await read(env,input.document_key);if(!doc||doc.id!==input.id)return json({error:'Verified document not found'},404);
+ const frequencies={};for(const word of ((doc.title+' '+doc.chunks.map(c=>c.content).join(' ')).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]))frequencies[word]=(frequencies[word]||0)+1;
+ const tokens=Object.fromEntries(Object.entries(frequencies).sort((a,b)=>b[1]-a[1]).slice(0,3000));
+ const entry={id:doc.id,key:input.document_key,jurisdiction:doc.jurisdiction_code,external_id:doc.external_id,title:doc.title,canonical_url:doc.canonical_url,hash:doc.content_sha256,updated_at:new Date().toISOString(),tokens};
+ for(let attempt=0;attempt<4;attempt++){const object=await env.CORPUS.get('search/delta.json'),previous=object?await object.json():{documents:[]};const documents=previous.documents.filter(d=>d.id!==entry.id);if(documents.length>=200)return json({error:'Delta index requires a full index reconciliation'},409);documents.push(entry);const next={documents,updated_at:entry.updated_at};const written=await env.CORPUS.put('search/delta.json',JSON.stringify(next),{onlyIf:object?{etagMatches:object.etag}:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'application/json'}});if(written)return json({published:true,id:entry.id,currentness_verified:false});}
+ return json({error:'Concurrent index publication; retry'},409);
+}
+export async function refreshTick(env){
+ const watchlist=await read(env,'refresh/watchlist.json');if(!watchlist?.documents?.length)return {state:'no-watchlist'};
+ const state=await read(env,'refresh/state.json')||{cursor:0,events:[]};const doc=watchlist.documents[state.cursor%watchlist.documents.length];const delta=await read(env,'search/delta.json');const current=delta?.documents?.find(d=>d.external_id===doc.external_id&&d.jurisdiction===doc.jurisdiction_code);
+ let result;try{const response=await fetch('https://lockeslaw.sheenax.xyz/api/corpus-refresh',{method:'POST',headers:{authorization:`Bearer ${env.INGEST_TOKEN}`,'content-type':'application/json'},body:JSON.stringify({...doc,content_sha256:current?.hash||doc.content_sha256}),redirect:'error',signal:AbortSignal.timeout(55000)});result=await response.json();if(!response.ok)result={state:'error',error:String(result.error||`Refresh returned ${response.status}`).slice(0,250)};}catch(error){result={state:'error',error:String(error.message).slice(0,250)};}
+ const event={title:doc.title,external_id:doc.external_id,canonical_url:doc.canonical_url,checked_at:new Date().toISOString(),...result};const next={cursor:state.cursor+1,coverage:watchlist.documents.length,events:[event,...state.events].slice(0,100)};await env.CORPUS.put('refresh/state.json',JSON.stringify(next),{httpMetadata:{contentType:'application/json'}});return event;
+}
 async function search(request,env){
  const input=await request.json(), query=terms(String(input.query||'').slice(0,4000));
  const manifest=await read(env,'search/current.json'); if(!manifest)return json({error:'Corpus index is not published'},503);
@@ -53,10 +73,13 @@ async function search(request,env){
    for(const [key,value] of best){const old=candidate.get(key)||{key,score:0,hits:0};old.score+=value*weight;old.hits+=weight;candidate.set(key,old);}
   });
  }));
+ const delta=await read(env,'search/delta.json');
+ for(const entry of delta?.documents||[]){if(!scope.includes(entry.jurisdiction))continue;let score=0,hits=0;for(const term of query){const count=Math.max(...(VARIANTS[term]||[term]).map(t=>entry.tokens[t]||0));if(count){score+=(1+Math.log1p(count))*(weights[term]||1);hits+=weights[term]||1;}}if(hits)candidate.set(entry.key,{key:entry.key,score,hits});}
  const top=[...candidate.values()].sort((a,b)=>(b.score+b.hits*10)-(a.score+a.hits*10)).slice(0,8);
- const evidence=[];
+ const evidence=[],seen=new Set();
  await Promise.all(top.map(async item=>{
-  const doc=await read(env,item.key);if(!doc||!scope.includes(doc.jurisdiction_code))return;
+  const newer=delta?.documents?.find(d=>item.key.startsWith(`documents/${d.id}/`));
+  const doc=await read(env,newer?.key||item.key);if(!doc||!scope.includes(doc.jurisdiction_code)||seen.has(doc.id))return;seen.add(doc.id);
   const ranked=doc.chunks.map((chunk,index)=>({chunk,index,score:rankPassage(chunk.content,query,weights)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.index-b.index).filter((hit,index,all)=>!all.slice(0,index).some(previous=>Math.abs(previous.index-hit.index)<=2)).slice(0,3);
   for(const hit of ranked){const adjacent=doc.chunks.slice(Math.max(0,hit.index-1),hit.index+2);hit.chunk={...hit.chunk,content:adjacent.map(c=>`[${c.page_number?'Page '+c.page_number:c.source_node_ref}]\n${c.content}`).join('\n\n')};}
   for(const [passageRank,{chunk,index,score}] of ranked.entries())evidence.push({legal_document_id:doc.id,chunk_id:`${doc.id}:${index}`,title:doc.title,citation:doc.citation,content:chunk.content,page_number:chunk.page_number||null,source_node_ref:chunk.source_node_ref,start_offset:chunk.start_offset??null,end_offset:chunk.end_offset??null,canonical_url:doc.canonical_url,source_url:doc.source_url||doc.canonical_url,jurisdiction_code:doc.jurisdiction_code,document_type:doc.document_type,published_at:doc.published_at,retrieved_at:doc.retrieved_at,version_notice:doc.version_notice||'Currentness and amendments require verification',ocr_requires_verification:doc.ocr_requires_verification||false,content_sha256:doc.content_sha256,attribution:doc.attribution,source_kind:'cloudflare-r2',passage_rank:passageRank,retrieval_score:(item.score+score*10)*(doc.document_type==='bill'?0.1:1)});
@@ -64,16 +87,20 @@ async function search(request,env){
  evidence.sort((a,b)=>a.passage_rank-b.passage_rank||b.retrieval_score-a.retrieval_score);
  return json({evidence:evidence.slice(0,Math.min(24,Number(input.limit)||24)),provider:'cloudflare-r2',as_of:manifest.as_of,generation:manifest.generation});
 }
-export default {async fetch(request,env){
+export default {async scheduled(controller,env,ctx){ctx.waitUntil(refreshTick(env));},async fetch(request,env){
  try{
  const path=new URL(request.url).pathname;
  if(path==='/health')return json({service:'locke-corpus',private_storage:true});
  if(path==='/stats'){const m=await read(env,'search/current.json');return m?json(m):json({documents:0,chunks:0,jurisdictions:[],state:'building'});}
+ if(path==='/changes'&&request.method==='GET'){if(request.headers.get('authorization')!==`Bearer ${env.SEARCH_TOKEN}`||!env.SEARCH_TOKEN)return json({error:'Unauthorized'},401);return json(await read(env,'refresh/state.json')||{coverage:0,events:[]});}
  if(path==='/search'&&request.method==='POST'){
   if(!env.SEARCH_TOKEN||request.headers.get('authorization')!==`Bearer ${env.SEARCH_TOKEN}`)return json({error:'Unauthorized'},401);
   return await search(request,env);
  }
  if(!env.INGEST_TOKEN||request.headers.get('authorization')!==`Bearer ${env.INGEST_TOKEN}`)return json({error:'Unauthorized'},401);
+ if(path==='/watchlist'&&request.method==='PUT'){const input=await request.json();const documents=validateWatchlist(input.documents);await env.CORPUS.put('refresh/watchlist.json',JSON.stringify({documents}));return json({saved:documents.length});}
+ if(path==='/refresh-tick'&&request.method==='POST')return json(await refreshTick(env));
+ if(path==='/delta-publish'&&request.method==='POST')return await publishDelta(request,env);
  if(path==='/checkpoint-prune'&&request.method==='POST'){
   const current=await read(env,'checkpoints/current.json');if(!current)return json({removed:0});
   let objects=[],cursor;

@@ -19,7 +19,7 @@ export function fuseSemanticRanking<T extends SearchEvidence>(rows:T[],vectors:n
 }
 export async function rerankEvidence<T extends SearchEvidence>(question:string,rows:T[]){
  if(!rows.length)return {evidence:rows,method:'no-evidence'};
- try{const {embeddings}=await embedMany({model:gateway.embeddingModel('openai/text-embedding-3-small'),values:[retrievalQuery(question),...rows.slice(0,32).map(row=>`${row.title||''}\n${row.content||''}`.slice(0,6000))],maxRetries:0,abortSignal:AbortSignal.timeout(8000)});
+ try{const {embeddings}=await embedMany({model:gateway.embeddingModel(process.env.LEGAL_EYE_EMBEDDING_MODEL?.trim()||'google/gemini-embedding-001'),values:[retrievalQuery(question),...rows.slice(0,32).map(row=>`${row.title||''}\n${row.content||''}`.slice(0,6000))],maxRetries:0,abortSignal:AbortSignal.timeout(12000)});
  return {evidence:fuseSemanticRanking(rows.slice(0,32),embeddings),method:'lexical+embedding-rerank'};
- }catch{return {evidence:rows,method:'lexical-fallback'};}
+ }catch(error){console.warn('Semantic reranking fallback',error instanceof Error?error.name:'unknown');return {evidence:rows,method:'lexical-fallback'};}
 }
