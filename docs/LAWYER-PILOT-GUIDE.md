@@ -2,7 +2,7 @@
 
 Application: https://lockeslaw.sheenax.xyz/
 
-**Owner preparation is still pending.** The 3 October audit fixed portal access and search, but the private parsing worker remains paused and signed-in end-to-end tests have not yet passed. Do not present this checklist as a completed release certificate.
+**Email onboarding and lawyer acceptance remain pending.** The 6 October replacement workspace passed authenticated API checks for private extraction and the main work flows. Browser onboarding, email verification/recovery and lawyer assessment still need completion. See `LAWYER-PILOT-STATUS-2026-10-06.md`; this checklist is not a release certificate.
 
 ## Account and workspace
 
@@ -18,7 +18,7 @@ Use fictional or de-identified files for this supervised evaluation. Keep actual
 | 2 | Ask: “An employee is dismissed for misconduct without a hearing. What Tanzanian statutory provisions should I examine?” | Source-backed answer; open each citation, inspect exact wording and currentness; explicit gaps if cases are unavailable |
 | 3 | Follow up: “What remedies should the lawyer investigate?” | Uses conversation context; cites supporting passages; no unsupported certainty |
 | 4 | Navigate away, sign out/in, reopen research | Question, answer and evidence reopen in the same workspace |
-| 5 | Create a synthetic TXT/PDF/DOCX agreement and upload it in Vault | Processing reaches Ready with useful error/retry behavior; owner must restore parsing first |
+| 5 | Create a synthetic TXT/PDF/DOCX agreement and upload it in Vault | Text-based files reach Ready; scanned PDFs explicitly request an OCR copy |
 | 6 | Ask which notice period the uploaded agreement specifies | Exact agreement wording and correct source reference; never uses an unrelated firm file |
 | 7 | Review: find confidentiality/termination issues | Quotes exist in the source; distinguishes commercial proposals from supported legal conclusions |
 | 8 | Tables: extract parties, dates, notice and governing law | Correct quotes; absent clauses return Not found; save/reopen/export works |
@@ -59,4 +59,4 @@ Share only fictional/de-identified examples through the agreed feedback channel.
 
 ## Exit decision
 
-The owner first verifies the complete synthetic workflow. The lawyer then assesses source quality and practical usefulness. Use the verdict “supervised pilot ready with stated limitations” only after those checks pass. Current status is blocked; no full Legora/Harvey equivalence or unrestricted production-use claim is made.
+The owner first verifies the complete synthetic workflow. The lawyer then assesses source quality and practical usefulness. Use the verdict “supervised pilot ready with stated limitations” only after those checks pass. Current handover remains blocked by email setup and uncompleted browser/lawyer acceptance. No full Legora/Harvey equivalence or unrestricted production-use claim is made.
