@@ -9,7 +9,9 @@ const SOURCES = {
 const json=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store','x-content-type-options':'nosniff'}});
 const sha=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),x=>x.toString(16).padStart(2,'0')).join('');
 export function terms(text){return [...new Set((text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu)||[]).filter(w=>!['the','and','for','with','from','that','this','shall','which','under','what','does','how','are','law','legal','tanzania','tanzanian','act','section','please'].includes(w)))].slice(0,10);}
-export function rankPassage(text,query){const lower=text.toLowerCase();const score=query.reduce((s,t)=>{const count=lower.split(t).length-1;return s+(count?1+Math.min(3,count-1)*0.15:0);},0);return /arrangement\s+of\s+sections|table\s+of\s+contents/i.test(text)?score*0.25:score;}
+const VARIANTS={employment:['employment','employee','employer'],termination:['termination','terminate','terminated','terminating','dismissal','dismissed'],procedural:['procedural','procedure','procedures'],unfair:['unfair','fair'],remedy:['remedy','remedies']};
+export function rankPassage(text,query,weights={}){const lower=text.toLowerCase();const score=query.reduce((s,t)=>{const count=Math.max(...(VARIANTS[t]||[t]).map(v=>lower.split(v).length-1));return s+(count?(weights[t]||1)*(1+Math.min(3,count-1)*0.15):0);},0);return /arrangement\s+of\s+sections|table\s+of\s+contents/i.test(text)?score*0.25:score;}
+
 async function read(env,key){const obj=await env.CORPUS.get(key);return obj?obj.json():null;}
 async function ingest(request,env){
  const form=await request.formData(), raw=form.get('raw'), metadata=String(form.get('document')||'{}');
@@ -40,21 +42,26 @@ async function search(request,env){
  const scope=(Array.isArray(input.jurisdictions)&&input.jurisdictions.length?input.jurisdictions:manifest.jurisdictions).filter(j=>SOURCES[j]);
  if(!query.length||!scope.length)return json({evidence:[],provider:'cloudflare-r2',as_of:manifest.as_of});
  const prefixOf=word=>{let h=0;for(const c of word)h=(h*31+c.codePointAt(0))>>>0;return (h%256).toString(16).padStart(2,'0');};
- const candidate=new Map();
+ const candidate=new Map(),weights={};
  await Promise.all(scope.map(async jurisdiction=>{
-  const prefixes=[...new Set(query.map(prefixOf))];
+  const expanded=[...new Set(query.flatMap(t=>VARIANTS[t]||[t]))];
+  const prefixes=[...new Set(expanded.map(prefixOf))];
   const shards=await Promise.all(prefixes.map(p=>read(env,`search/${manifest.generation}/${jurisdiction}/${p}.json`)));
-  query.forEach(term=>{const index=prefixes.indexOf(prefixOf(term));for(const hit of shards[index]?.[term]||[]){const key=hit[0],old=candidate.get(key)||{key,score:0,hits:0};old.score+=hit[1];old.hits++;candidate.set(key,old);}});
+  query.forEach(term=>{const best=new Map();for(const variant of VARIANTS[term]||[term]){const index=prefixes.indexOf(prefixOf(variant));for(const hit of shards[index]?.[variant]||[])best.set(hit[0],Math.max(best.get(hit[0])||0,hit[1]));}
+   const importance=['misconduct','disciplinary','hearing','procedural','admissibility','indemnity','confidentiality'].includes(term)?2.5:1;
+   const weight=importance*Math.max(1,Math.log1p(256/Math.max(1,best.size)));weights[term]=Math.max(weights[term]||1,weight);
+   for(const [key,value] of best){const old=candidate.get(key)||{key,score:0,hits:0};old.score+=value*weight;old.hits+=weight;candidate.set(key,old);}
+  });
  }));
  const top=[...candidate.values()].sort((a,b)=>(b.score+b.hits*10)-(a.score+a.hits*10)).slice(0,8);
  const evidence=[];
  await Promise.all(top.map(async item=>{
   const doc=await read(env,item.key);if(!doc||!scope.includes(doc.jurisdiction_code))return;
-  const ranked=doc.chunks.map((chunk,index)=>({chunk,index,score:rankPassage(chunk.content,query)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,1);
+  const ranked=doc.chunks.map((chunk,index)=>({chunk,index,score:rankPassage(chunk.content,query,weights)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.index-b.index).filter((hit,index,all)=>!all.slice(0,index).some(previous=>Math.abs(previous.index-hit.index)<=2)).slice(0,3);
   for(const hit of ranked){const adjacent=doc.chunks.slice(Math.max(0,hit.index-1),hit.index+2);hit.chunk={...hit.chunk,content:adjacent.map(c=>`[${c.page_number?'Page '+c.page_number:c.source_node_ref}]\n${c.content}`).join('\n\n')};}
-  for(const {chunk,index,score} of ranked)evidence.push({legal_document_id:doc.id,chunk_id:`${doc.id}:${index}`,title:doc.title,citation:doc.citation,content:chunk.content,page_number:chunk.page_number||null,source_node_ref:chunk.source_node_ref,start_offset:chunk.start_offset??null,end_offset:chunk.end_offset??null,canonical_url:doc.canonical_url,source_url:doc.source_url||doc.canonical_url,jurisdiction_code:doc.jurisdiction_code,document_type:doc.document_type,published_at:doc.published_at,retrieved_at:doc.retrieved_at,version_notice:doc.version_notice||'Currentness and amendments require verification',ocr_requires_verification:doc.ocr_requires_verification||false,content_sha256:doc.content_sha256,attribution:doc.attribution,source_kind:'cloudflare-r2',retrieval_score:(item.score+score*10)*(doc.document_type==='bill'?0.1:1)});
+  for(const [passageRank,{chunk,index,score}] of ranked.entries())evidence.push({legal_document_id:doc.id,chunk_id:`${doc.id}:${index}`,title:doc.title,citation:doc.citation,content:chunk.content,page_number:chunk.page_number||null,source_node_ref:chunk.source_node_ref,start_offset:chunk.start_offset??null,end_offset:chunk.end_offset??null,canonical_url:doc.canonical_url,source_url:doc.source_url||doc.canonical_url,jurisdiction_code:doc.jurisdiction_code,document_type:doc.document_type,published_at:doc.published_at,retrieved_at:doc.retrieved_at,version_notice:doc.version_notice||'Currentness and amendments require verification',ocr_requires_verification:doc.ocr_requires_verification||false,content_sha256:doc.content_sha256,attribution:doc.attribution,source_kind:'cloudflare-r2',passage_rank:passageRank,retrieval_score:(item.score+score*10)*(doc.document_type==='bill'?0.1:1)});
  }));
- evidence.sort((a,b)=>b.retrieval_score-a.retrieval_score);
+ evidence.sort((a,b)=>a.passage_rank-b.passage_rank||b.retrieval_score-a.retrieval_score);
  return json({evidence:evidence.slice(0,Math.min(24,Number(input.limit)||24)),provider:'cloudflare-r2',as_of:manifest.as_of,generation:manifest.generation});
 }
 export default {async fetch(request,env){

@@ -37,3 +37,16 @@ test('checkpoint cleanup retains three complete backups and newer in-flight part
  const response=await worker.fetch(new Request('https://example.org/checkpoint-prune',{method:'POST',headers:{authorization:'Bearer test'}}),{INGEST_TOKEN:'test',CORPUS:{get:async()=>({json:async()=>({generation:'backup-4'})}),list:async()=>({objects:keys.filter(k=>k.startsWith('checkpoints/')).map(key=>({key})),truncated:false}),delete:async key=>removed.push(key)}});
  assert.equal(response.status,200);assert.deepEqual(removed,['checkpoints/backup-1/manifest.json','checkpoints/backup-1/part-0']);
 });
+test('passage ranking recognizes legal inflections and prioritizes a specific issue',()=>{
+ const query=['employment','termination','misconduct','procedural'];const weights={misconduct:2.5,procedural:2.5};
+ const procedure='The employer must follow a fair procedure before dismissal for misconduct.';
+ const unrelated='Employment employment employment termination notice notice.';
+ assert.ok(rankPassage(procedure,query,weights)>rankPassage(unrelated,query,weights));
+});
+test('search retains distinct issue-bearing passages from the same authority',async()=>{
+ const doc={id:'authority',title:'Employment statute',jurisdiction_code:'TZ',document_type:'act',chunks:Array.from({length:10},(_,index)=>({content:index===0?'Employment dismissal misconduct notice':index===5?'Employment termination must follow a fair procedure':'Unrelated provision',page_number:index+1,source_node_ref:'page-'+index}))};
+ const index={employment:[['documents/authority',20]],termination:[['documents/authority',2]],misconduct:[['documents/authority',2]],procedural:[['documents/authority',2]]};
+ const response=await worker.fetch(new Request('https://example.org/search',{method:'POST',headers:{authorization:'Bearer test'},body:JSON.stringify({query:'employment termination misconduct procedural',jurisdictions:['TZ'],limit:16})}),{SEARCH_TOKEN:'test',CORPUS:{get:async key=>({json:async()=>key==='search/current.json'?{generation:'test',jurisdictions:['TZ']}:key==='documents/authority'?doc:index})}});
+ assert.equal(response.status,200);const {evidence}=await response.json();
+ assert.equal(evidence.length,2);assert.ok(evidence.some(hit=>hit.content.includes('fair procedure')));assert.ok(evidence.some(hit=>hit.content.includes('misconduct notice')));
+});

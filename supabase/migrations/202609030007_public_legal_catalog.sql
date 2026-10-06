@@ -4,7 +4,7 @@ create policy source_registry_public_read on public.source_registry
   for select to anon using (true);
 
 create policy legal_documents_public_read on public.legal_documents
-  for select to anon using (
+  for select to anon, authenticated using (
     source_id is not null
     and exists (
       select 1 from public.source_registry s

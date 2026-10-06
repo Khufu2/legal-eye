@@ -104,16 +104,21 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
     const corpusToken = process.env.LEGAL_CORPUS_SEARCH_TOKEN?.trim();
     if (corpusUrl) {
       if (!corpusToken) throw new Error('Cloudflare corpus search configuration is incomplete.');
-      const result = await fetch(`${corpusUrl.replace(/\/$/, '')}/search`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${corpusToken}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ query: searchTerms(options.query).join(' ') || options.query, jurisdictions: options.jurisdictions, limit: 24 }),
-        cache: 'no-store', signal: AbortSignal.timeout(25000),
-      });
-      if (!result.ok) throw new Error(`Public legal corpus search is unavailable (${result.status}). No legal conclusion was generated.`);
-      const data = await result.json();
-      if (!Array.isArray(data.evidence)) throw new Error('Public corpus returned an invalid evidence response.');
-      return data.evidence;
+      const searchQuery=searchTerms(options.query).join(' ') || options.query;
+      const focused=/misconduct|disciplinary/i.test(options.query) && /terminat|dismiss|procedur|hearing/i.test(options.query) ? 'employment termination unfair procedure' : null;
+      const plans=[...new Set([focused,searchQuery].filter((query):query is string=>Boolean(query)))];
+      const responses=await Promise.all(plans.map(async query=>{
+        const result = await fetch(`${corpusUrl.replace(/\/$/, '')}/search`, {
+          method: 'POST', headers: { authorization: `Bearer ${corpusToken}`, 'content-type': 'application/json' },
+          body: JSON.stringify({query,jurisdictions:options.jurisdictions,limit:16}),
+          cache:'no-store',signal:AbortSignal.timeout(25000),
+        });
+        if(!result.ok)throw new Error(`Public legal corpus search is unavailable (${result.status}). No legal conclusion was generated.`);
+        const data=await result.json();if(!Array.isArray(data.evidence))throw new Error('Public corpus returned an invalid evidence response.');return data.evidence;
+      }));
+      const unique=new Map<string,Record<string,unknown>>();
+      for(const row of responses.flat())if(!unique.has(row.chunk_id))unique.set(row.chunk_id,row);
+      return [...unique.values()].slice(0,16);
     }
     let lastError: unknown = null;
     for (const pQuery of queries) {
