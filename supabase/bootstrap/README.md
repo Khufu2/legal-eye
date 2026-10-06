@@ -1,0 +1,13 @@
+# Rebuild Locke on an empty Supabase project
+
+1. Apply `001_core.sql`, then `002_core_functions.sql`.
+2. Apply every file in `../migrations` in filename order.
+3. Apply `003_integrity_and_processing.sql`, then subsequent numbered bootstrap files.
+4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the app hosting environments and redeploy.
+5. Configure Auth site URL/redirects and a custom SMTP service. Enable email verification; never disable verification to bypass delivery problems.
+6. Keep `LEGAL_CORPUS_URL` and `LEGAL_CORPUS_SEARCH_TOKEN` server-only. Public source files and passages remain in Cloudflare. Do not restart the former bulk Supabase corpus writers.
+7. Verify onboarding, tenant isolation, storage permissions, source extraction, versioning, AI workflows and portal revocation with disposable acceptance accounts.
+
+Public legal metadata may be mirrored for monitoring. Public document bodies, chunks and vector embeddings must remain outside the free-plan database. The app processes text-based PDF, DOCX, TXT and Markdown privately using the caller's JWT and an atomic invoker RPC. Scanned PDFs require an OCR copy; the expired Railway Docling service is not required or represented as running.
+
+The historical migrations are retained for reproducibility. Their nominal timestamps precede the newly reconstructed foundation; always use the order above on a fresh project. No live user data or credentials are included in these files.

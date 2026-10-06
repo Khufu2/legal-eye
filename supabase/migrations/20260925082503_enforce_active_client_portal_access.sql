@@ -1,8 +1,8 @@
 -- Keep firm matter permissions and revoke guest reads when a portal is archived.
-create or replace function private.has_portal_access(p_portal_id uuid)
+create or replace function private.has_portal_access(p_portal uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select auth.uid() is not null and exists (
-    select 1 from public.client_portals p where p.id=p_portal_id and (
+    select 1 from public.client_portals p where p.id=p_portal and (
       (private.is_org_member(p.organization_id) and (p.matter_id is null or private.has_matter_access(p.matter_id)))
       or (p.status='active' and exists (
         select 1 from public.portal_members pm where pm.portal_id=p.id and pm.user_id=auth.uid()
