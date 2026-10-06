@@ -837,3 +837,25 @@ html[data-theme="dark"] .view-vault .vault-document [data-slot=button]{
 .trust-live-grid>section{max-height:620px;overflow:auto;overscroll-behavior:contain}
 .trust-live-grid>section>.subhead{position:sticky;top:0;z-index:2;background:var(--card);padding-bottom:14px}
 .trust-live-grid>section>input{margin-bottom:16px;width:100%}
+
+/* Trust needs the same visual hierarchy as the legal workbenches. */
+.trust-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:28px 0}
+.trust-kpis article{display:flex;align-items:center;gap:13px;padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--card);min-width:0}
+.trust-kpis article>svg{width:22px;height:22px;flex-shrink:0;color:var(--blue)}
+.trust-kpis article span{display:grid;gap:6px;min-width:0}
+.trust-kpis article b{display:block;line-height:1.1;font-weight:550;letter-spacing:-.025em}
+.trust-kpis article small{display:block;color:var(--quiet);line-height:1.4}
+.trust-live-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:20px;align-items:start}
+.trust-live-grid>section{min-width:0;padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.trust-live-grid .subhead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.trust-live-grid .subhead>div{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.trust-live-grid .subhead svg{width:19px;height:19px;color:var(--blue);flex-shrink:0;margin-top:2px}
+.trust-live-grid .subhead span{display:grid;gap:6px}
+.trust-live-grid .subhead b{font-size:16px;font-weight:550;line-height:1.3}
+.trust-live-grid .subhead small{font-size:12px;color:var(--quiet);line-height:1.5}
+.trust-live-grid td{vertical-align:top;line-height:1.5;padding:14px 10px}
+.trust-live-grid th{font-size:11px;letter-spacing:.035em;white-space:nowrap}
+.trust-live-grid .block-small{display:block;color:var(--quiet);font-size:11px;margin-top:6px;line-height:1.45;overflow-wrap:anywhere}
+.trust-live-grid td:first-child b{display:block;font-weight:500}
+@media(max-width:1100px){.trust-live-grid{grid-template-columns:1fr}.trust-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){.trust-kpis{gap:10px}.trust-kpis article{padding:14px;align-items:flex-start;gap:9px}.trust-live-grid>section{padding:14px}}
