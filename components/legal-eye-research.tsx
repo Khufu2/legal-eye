@@ -14,17 +14,17 @@ type Treatment={target_citation:string;treatment:string;judgment_citation:string
 type Citator={entries:Treatment[];coverage:string;absence_means:string;current_good_law_verified:boolean};
 type Turn = { firmCitator?:Citator; question: string; answer: string; evidence: Evidence[]; created_at: string };
 type Session = { id: string; title: string; query: string; answer_markdown: string; jurisdiction_codes: string[]; matter_id?: string | null; metadata: { turns?: Turn[]; evidence?: Evidence[] }; updated_at: string; use_firm_knowledge?:boolean };
-type Props = { identity: Identity | null; connect: () => void; initialQuery: string; autoRun: number; sessionId: string | null; onSession: (id: string) => void; jurisdictions: string[]; setJurisdictions: (values: string[]) => void; matterId: string | null; privateContext: boolean };
+type Props = { identity: Identity | null; connect: () => void; initialQuery: string; autoRun: number; sessionId: string | null; onSession: (id: string) => void; onScope:(matterId:string|null)=>void; jurisdictions: string[]; setJurisdictions: (values: string[]) => void; matterId: string | null; privateContext: boolean };
 
-export function ResearchLive({ identity, connect, initialQuery, autoRun, sessionId, onSession, jurisdictions, setJurisdictions, matterId, privateContext }: Props) {
+export function ResearchLive({ identity, connect, initialQuery, autoRun, sessionId, onSession, onScope, jurisdictions, setJurisdictions, matterId, privateContext }: Props) {
   const [question, setQuestion] = useState(initialQuery), [turns, setTurns] = useState<Turn[]>([]), [history, setHistory] = useState<Session[]>([]), [search, setSearch] = useState("");
   const [historyOpen,setHistoryOpen]=useState(false),[scope,setScope]=useState({matterId,privateContext});
   const [loadingSession, setLoadingSession] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [selected, setSelected] = useState<Evidence | null>(null), [saved, setSaved] = useState(true), [saving, setSaving] = useState(false);
   const seen = useRef(0), currentSession = useRef(sessionId), loadedSession = useRef<string | null>(null), inFlight = useRef(false);
   const latest = turns.at(-1);
-  const loadHistory = async () => { if (identity) setHistory(await workspace<Session[]>(identity, `research_sessions?select=id,title,query,answer_markdown,jurisdiction_codes,matter_id,use_firm_knowledge,metadata,updated_at&organization_id=eq.${identity.organization_id}&order=updated_at.desc&limit=60`)); };
-  useEffect(() => { void loadHistory().catch(() => undefined); }, [identity]);
+  const loadHistory = async () => { if (identity) setHistory(await workspace<Session[]>(identity, `research_sessions?select=id,title,query,answer_markdown,jurisdiction_codes,matter_id,use_firm_knowledge,metadata,updated_at&organization_id=eq.${identity.organization_id}${matterId?`&matter_id=eq.${matterId}`:""}&order=updated_at.desc&limit=60`)); };
+  useEffect(() => { void loadHistory().catch(() => undefined); }, [identity,matterId]);
   useEffect(() => {
     if (!identity || !sessionId || loadedSession.current === sessionId || inFlight.current) return;
     let cancelled = false;
@@ -33,7 +33,7 @@ export function ResearchLive({ identity, connect, initialQuery, autoRun, session
     void workspace<Session[]>(identity, `research_sessions?select=id,title,query,answer_markdown,jurisdiction_codes,matter_id,use_firm_knowledge,metadata,updated_at&id=eq.${sessionId}&organization_id=eq.${identity.organization_id}`).then(rows => {
       if (cancelled) return;
       if (!rows[0]) throw new Error("This research session is unavailable.");
-      const row = rows[0]; loadedSession.current = row.id;setScope({matterId:row.matter_id||null,privateContext:row.use_firm_knowledge??true});setSelected(null);
+      const row = rows[0]; loadedSession.current = row.id;setScope({matterId:row.matter_id||null,privateContext:row.use_firm_knowledge??true});onScope(row.matter_id||null);setSelected(null);
       setTurns(row.metadata?.turns || [{ question: row.query, answer: row.answer_markdown, evidence: row.metadata?.evidence || [], created_at: row.updated_at }]);
       setJurisdictions(row.jurisdiction_codes || ["TZ"]); setQuestion(""); setSaved(true);
     }).catch(e => { if (!cancelled) setError(e.message); }).finally(() => { if (!cancelled) setLoadingSession(false); });
