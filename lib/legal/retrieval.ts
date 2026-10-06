@@ -1,3 +1,4 @@
+import {conceptualSearchQuery,rerankEvidence,retrievalQuery} from './semantic-retrieval.ts';
 /** Explainable ranking inputs. Vector similarity is never authority by itself. */
 export type LegalRetrievalSignals = {
   fullTextRank: number;
@@ -104,13 +105,15 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
     const corpusToken = process.env.LEGAL_CORPUS_SEARCH_TOKEN?.trim();
     if (corpusUrl) {
       if (!corpusToken) throw new Error('Cloudflare corpus search configuration is incomplete.');
-      const searchQuery=searchTerms(options.query).join(' ') || options.query;
+      const safeQuery=retrievalQuery(options.query);
+      const searchQuery=searchTerms(safeQuery).join(' ') || safeQuery;
+      const conceptual=await conceptualSearchQuery(safeQuery);
       const focused=/misconduct|disciplinary/i.test(options.query) && /terminat|dismiss|procedur|hearing/i.test(options.query) ? 'employment termination unfair procedure' : null;
-      const plans=[...new Set([focused,searchQuery].filter((query):query is string=>Boolean(query)))];
+      const plans=[...new Set([focused,searchQuery,conceptual].filter((query):query is string=>Boolean(query)))];
       const responses=await Promise.all(plans.map(async query=>{
         const result = await fetch(`${corpusUrl.replace(/\/$/, '')}/search`, {
           method: 'POST', headers: { authorization: `Bearer ${corpusToken}`, 'content-type': 'application/json' },
-          body: JSON.stringify({query,jurisdictions:options.jurisdictions,limit:16}),
+          body: JSON.stringify({query,jurisdictions:options.jurisdictions,limit:24}),
           cache:'no-store',signal:AbortSignal.timeout(25000),
         });
         if(!result.ok)throw new Error(`Public legal corpus search is unavailable (${result.status}). No legal conclusion was generated.`);
@@ -118,7 +121,7 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
       }));
       const unique=new Map<string,Record<string,unknown>>();
       for(const row of responses.flat())if(!unique.has(row.chunk_id))unique.set(row.chunk_id,row);
-      return [...unique.values()].slice(0,16);
+      return [...unique.values()].slice(0,32);
     }
     let lastError: unknown = null;
     for (const pQuery of queries) {
@@ -142,5 +145,6 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
     publicSearch(),
     options.privateContext ? rpc('search_private_text',{p_query:privateQuery,p_organization_id:options.organizationId,p_matter_id:options.matterId || null,p_limit:12}) : Promise.resolve([])
   ]);
-  return {publicEvidence,privateEvidence,retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
+  const [rankedPublic,rankedPrivate]=await Promise.all([rerankEvidence(options.query,publicEvidence),rerankEvidence(options.query,privateEvidence)]);
+  return {publicEvidence:rankedPublic.evidence.slice(0,16),privateEvidence:rankedPrivate.evidence.slice(0,12),retrievalMethods:{public:rankedPublic.method,private:rankedPrivate.method},retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
 }

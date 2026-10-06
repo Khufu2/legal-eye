@@ -4,6 +4,7 @@ import { generateText, gateway, Output } from "ai";
 import { z } from "zod";
 import { retrieveEvidence } from "@/lib/legal/retrieval";
 import { fetchOfficialSourceEvidence } from "./public-source-fallback";
+import { auditResearchCitations } from "@/lib/legal/citation-audit";
 
 export const maxDuration = 60;
 
@@ -148,8 +149,12 @@ export async function POST(request: Request) {
         prompt,
         providerOptions: gatewayOptions,
       });
-      await recordGeneration(token, input, prompt, generated.text, generated.totalUsage, started);
-      return response({ ...evidence, answer: generated.text, provider: "vercel-ai-gateway", model: modelName });
+      const citationAudit=auditResearchCitations(generated.text,publicEvidence,privateEvidence);
+      const answer=citationAudit.unknownLabels.length
+        ? 'Citation verification failed: the generated answer referenced evidence that was not supplied. No legal conclusion is shown. Retry with a narrower question and inspect the source passages.'
+        : generated.text+(citationAudit.warnings.length?'\n\nVerification notes:\n'+citationAudit.warnings.map(w=>`- ${w}`).join('\n'):'');
+      await recordGeneration(token, input, prompt, answer, generated.totalUsage, started);
+      return response({ ...evidence, answer, citationAudit, provider: "vercel-ai-gateway", model: modelName });
     }
 
     if (input.action === "draft") {

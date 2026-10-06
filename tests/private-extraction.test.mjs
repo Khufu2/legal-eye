@@ -14,6 +14,6 @@ test('private text preserves source pages and bounded overlapping passages',()=>
  assert.throws(()=>privateChunks([{page_number:1,content:' '}]),/No readable text/);
 });
 test('unsupported files and oversized source text fail explicitly',async()=>{
- await assert.rejects(extractPrivateFile(new Uint8Array([1,2]),'sheet.xlsx','application/octet-stream'),/Choose a text-based PDF/);
+ await assert.rejects(extractPrivateFile(new Uint8Array([1,2]),'sheet.xlsx','application/octet-stream'),/Choose a PDF, DOCX/);
  assert.throws(()=>privateChunks([{page_number:null,content:'x'.repeat(2_000_001)}]),/processing limit/);
 });

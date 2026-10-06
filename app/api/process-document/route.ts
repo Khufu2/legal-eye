@@ -19,6 +19,6 @@ export async function POST(request:Request){
  const size=Number(source.headers.get("content-length")||0);if(size>20_971_520)return json({error:"File exceeds 20 MB"},413);
  const bytes=new Uint8Array(await source.arrayBuffer());const chunks=privateChunks(await extractPrivateFile(bytes,doc.file_name||"",doc.mime_type||""));
  const saved=await fetch(`${url}/rest/v1/rpc/replace_private_document_text`,{method:"POST",headers:{...headers,"content-type":"application/json"},body:JSON.stringify({p_document_id:doc.id,p_content_hash:createHash("sha256").update(bytes).digest("hex"),p_chunks:chunks}),cache:"no-store"});const payload=await saved.json().catch(()=>({}));if(!saved.ok)return json({error:payload.message||"Processed text could not be saved"},saved.status);
- return json({ok:true,status:"complete",searchable:true,chunks:payload,processing_mode:"text-extraction",engine:"unpdf-or-ooxml",requires_ocr:false});
+ return json({ok:true,status:"complete",searchable:true,chunks:payload,processing_mode:"text-extraction",engine:chunks.some(c=>c.ocr_requires_verification)?"tesseract-ocr":"unpdf-or-ooxml",requires_ocr:false,ocr_requires_verification:chunks.some(c=>c.ocr_requires_verification),engine_notice:chunks.some(c=>c.ocr_requires_verification)?'OCR text requires comparison with the original scan.':null});
  }catch(e){return json({error:e instanceof Error?e.message:"Document processing failed"},e instanceof z.ZodError?400:422);}
 }
