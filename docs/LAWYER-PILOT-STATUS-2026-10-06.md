@@ -41,10 +41,16 @@ Use `LAWYER-PILOT-GUIDE.md` for supervised fictional/de-identified evaluation af
 
 ## Remaining feature limits
 
-- Scanned/image-only PDFs require an OCR copy; automatic OCR and XLSX private ingestion are not implemented by the new extractor. PDF/DOCX structure is text extraction, not verified layout analysis.
-- Public retrieval is lexical. Semantic retrieval, verified authority treatment/citator, complete judgments and amendment/currentness reconciliation are not established. The retrieval benchmark tests authority discovery, not answer accuracy.
-- The expired Railway source-ingestion service is not running. No unattended corpus refresh is claimed. Catalogue monitors are narrower than comprehensive legal-change alerts.
-- Agent and workflow API steps work, but durable unattended orchestration and native Microsoft Word/Outlook host acceptance remain outstanding.
+- English image-only PDFs now support local OCR with a 20-scanned-page limit, bounded rendering and source-verification flags. Live OCR upload → processing → private search passed. XLSX private ingestion and verified layout analysis remain absent.
+- Public retrieval now uses conceptual query expansion and embedding reranking of up to 32 retrieved candidates, with a visible lexical fallback. Live embedding reranking passed. This is not a complete semantic vector index. Passage-label and verbatim quotation checks flag unsupported output; verified authority treatment/citator, complete judgments and amendment/currentness reconciliation remain unestablished.
+- A Cloudflare cron checks 22 priority Tanzanian source PDFs in rotation, one every ten minutes. Unchanged-file checking passed live. Changed-file parsing, version publication and concurrent-index protection passed regression tests; no actual changed official file was encountered in acceptance. New-law discovery, full-corpus refresh and comprehensive legal-change alerts remain outstanding.
+- Workflow execution now continues through Vercel Workflow after the start request returns, preserves human checkpoints and saved results, guards replayed steps and respects cancellation/revoked membership. Live background/approval/cancellation/access checks passed. Expired caller sessions require sign-in and resume; native Microsoft Word/Outlook host acceptance remains outstanding.
 - Supabase advisors flag intentional authenticated privileged RPCs; their caller/email/role checks were exercised by regression tests. Leaked-password protection remains subject to the project's available Auth controls. See https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
 
 **Release decision:** replacement backend operational; supervised lawyer handover pending the email and browser acceptance gates above. Do not label the product fully finished or unrestricted production-ready.
+
+## Feature release update
+
+Commits `bb4e820`, `67a32dc` and `4a4a8c5` added the features above. Vercel production deployment `dpl_8UwTQfdvLex7vAjK492y98JodFZh` is READY. The source Worker and ten-minute cron are active. All **40 Node regression tests** passed, app TypeScript passed, and the source monitor browser showed the priority coverage and recorded checks. Synthetic live API checks verified OCR metadata and private search, embedding reranking, durable approvals, replay guard, cancellation and revoked-membership rejection. These tests do not replace email onboarding, authenticated browser acceptance or lawyer accuracy/currentness assessment.
+
+Email setup remains an external configuration gate: the replacement project's SMTP credentials and verified sender have not been supplied or saved. No user verification settings were weakened. Do not describe this update as Harvey/Legora parity or all-law coverage.

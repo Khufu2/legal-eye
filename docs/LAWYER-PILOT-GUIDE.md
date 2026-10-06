@@ -18,7 +18,7 @@ Use fictional or de-identified files for this supervised evaluation. Keep actual
 | 2 | Ask: “An employee is dismissed for misconduct without a hearing. What Tanzanian statutory provisions should I examine?” | Source-backed answer; open each citation, inspect exact wording and currentness; explicit gaps if cases are unavailable |
 | 3 | Follow up: “What remedies should the lawyer investigate?” | Uses conversation context; cites supporting passages; no unsupported certainty |
 | 4 | Navigate away, sign out/in, reopen research | Question, answer and evidence reopen in the same workspace |
-| 5 | Create a synthetic TXT/PDF/DOCX agreement and upload it in Vault | Text-based files reach Ready; scanned PDFs explicitly request an OCR copy |
+| 5 | Create a synthetic TXT/PDF/DOCX agreement and upload it in Vault | TXT/DOCX and text PDFs reach Ready; English scans of up to 20 scanned pages are OCR-processed and require comparison with the originals |
 | 6 | Ask which notice period the uploaded agreement specifies | Exact agreement wording and correct source reference; never uses an unrelated firm file |
 | 7 | Review: find confidentiality/termination issues | Quotes exist in the source; distinguishes commercial proposals from supported legal conclusions |
 | 8 | Tables: extract parties, dates, notice and governing law | Correct quotes; absent clauses return Not found; save/reopen/export works |
