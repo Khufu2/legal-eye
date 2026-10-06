@@ -159,10 +159,10 @@ export async function POST(request: Request) {
 
     if (input.action === "draft") {
       if (!input.instructions) return response({ error: "Drafting instructions required" }, 400);
-      const prompt = dlp(`Document type: ${input.document_type ?? "Legal memorandum"}\nJurisdictions: ${(input.jurisdictions ?? ["TZ"]).join(", ")}\nInstructions: ${input.instructions}\nVerified context supplied by the lawyer:\n${input.context ?? "None"}`);
+      const prompt = dlp(`Document type: ${input.document_type ?? "Legal memorandum"}\nJurisdictions: ${(input.jurisdictions ?? ["TZ"]).join(", ")}\nInstructions: ${input.instructions}\nSupplied context (may include unreviewed AI output; verify against sources):\n${input.context ?? "None"}`);
       const generated = await generateText({
         model: gateway(modelName),
-        system: "You are a senior legal drafting assistant. Draft conservatively, never invent legal authority or facts, preserve [PLACEHOLDER] markers for missing facts, mark assumptions, and use professional legal structure. Begin with 'AI DRAFT — LAWYER REVIEW REQUIRED'.",
+        system: "You are a senior legal drafting assistant. Draft conservatively, never invent legal authority or facts, preserve [PLACEHOLDER] markers for missing facts, mark assumptions, and use professional legal structure. Dates, client names, author names and addresses must come from the supplied source or explicit instructions; otherwise omit the field or use [DATE], [CLIENT], [AUTHOR] and [ADDRESS]. Never fill a date from memory. Supplied AI output is not independently verified evidence. Follow the requested format and length; a short summary does not require a memorandum header. Begin with 'AI DRAFT — LAWYER REVIEW REQUIRED'.",
         prompt,
         providerOptions: gatewayOptions,
       });
