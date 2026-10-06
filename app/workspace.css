@@ -826,3 +826,14 @@ html[data-theme="dark"] .view-vault .vault-document [data-slot=button]{
 .intelligence-guide .intelligence-guide-steps{padding:4px 18px 18px}
 .field-error{display:block;margin:5px 0 0;color:var(--red);font-size:13px;font-weight:400;line-height:1.45}
 .intelligence-guide>summary:focus-visible{outline:2px solid var(--ring);outline-offset:3px;border-radius:10px}
+
+.trust-disclosure{margin-top:20px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:0 20px}
+.trust-disclosure>summary{padding:18px 0;cursor:pointer;font-size:15px;font-weight:500}
+.trust-disclosure>summary:focus-visible{outline:2px solid var(--ring);outline-offset:3px}
+.trust-disclosure .workspace-team,.trust-disclosure .firm-citator{border:0;margin:0;padding:4px 0 20px}
+.matter-grid .live-card button{margin-top:16px}
+@media(max-width:640px){.live-create-bar{flex-direction:column;align-items:stretch}.live-create-bar input{width:100%;min-width:0}.monitor-live-grid article{flex-wrap:wrap}.trust-disclosure{padding:0 14px}}
+
+.trust-live-grid>section{max-height:620px;overflow:auto;overscroll-behavior:contain}
+.trust-live-grid>section>.subhead{position:sticky;top:0;z-index:2;background:var(--card);padding-bottom:14px}
+.trust-live-grid>section>input{margin-bottom:16px;width:100%}
