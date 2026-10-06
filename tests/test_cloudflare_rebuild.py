@@ -10,7 +10,7 @@ class CloudflareRebuildTests(unittest.TestCase):
  def test_scanned_document_budget_exhaustion_never_accepts_partial_text(self):
   with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{'LOCKE_CORPUS_INGEST_TOKEN':'unit-test'}):
    runner=module.Rebuild('https://locke-corpus.ivogeraldladjr.workers.dev','unused',folder+'/db.sqlite')
-   with patch.object(module.subprocess,'run',side_effect=[SimpleNamespace(stdout=b''),SimpleNamespace(stdout='Pages: 10\n')]),patch.object(module.time,'monotonic',side_effect=[0,181]):
+   with patch.object(module.subprocess,'run',side_effect=[SimpleNamespace(stdout=b''),SimpleNamespace(stdout='Pages: 10\n')]),patch.object(module.time,'monotonic',side_effect=[0,1801]):
     with self.assertRaisesRegex(ValueError,'OCR time budget'):runner.ingest({'external_id':'synthetic','title':'Synthetic','jurisdiction_code':'TZ'},b'%PDF synthetic','application/pdf')
    self.assertEqual(runner.db.execute('SELECT count(*) FROM documents').fetchone()[0],0)
    runner.client.close();runner.db.close()

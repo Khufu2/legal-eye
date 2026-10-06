@@ -1,3 +1,4 @@
+import {lookupFirmTreatment} from './firm-citator.ts';
 import {conceptualSearchQuery,rerankEvidence,retrievalQuery} from './semantic-retrieval.ts';
 /** Explainable ranking inputs. Vector similarity is never authority by itself. */
 export type LegalRetrievalSignals = {
@@ -146,5 +147,6 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
     options.privateContext ? rpc('search_private_text',{p_query:privateQuery,p_organization_id:options.organizationId,p_matter_id:options.matterId || null,p_limit:12}) : Promise.resolve([])
   ]);
   const [rankedPublic,rankedPrivate]=await Promise.all([rerankEvidence(options.query,publicEvidence),rerankEvidence(options.query,privateEvidence)]);
-  return {publicEvidence:rankedPublic.evidence.slice(0,16),privateEvidence:rankedPrivate.evidence.slice(0,12),retrievalMethods:{public:rankedPublic.method,private:rankedPrivate.method},retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
+  const firmCitator=options.privateContext===false?{entries:[],coverage:'Firm knowledge disabled',absence_means:'unknown',current_good_law_verified:false}:await lookupFirmTreatment({...options,evidence:rankedPublic.evidence});
+  return {firmCitator,publicEvidence:rankedPublic.evidence.slice(0,16),privateEvidence:rankedPrivate.evidence.slice(0,12),retrievalMethods:{public:rankedPublic.method,private:rankedPrivate.method},retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
 }

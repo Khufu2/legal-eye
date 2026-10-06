@@ -13,7 +13,7 @@ import httpx
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('open_corpus',ROOT/'services/open-corpus/worker.py')
 upstream=importlib.util.module_from_spec(spec);spec.loader.exec_module(upstream)
-MAX_BYTES=32*1024*1024
+MAX_BYTES=96*1024*1024
 COLLECTIONS=[('acts','acts-ajax','act'),('revised_acts','revised-acts-ajax','revised_act'),('subsidiary_legislation','legislation-ajax','subsidiary_legislation'),('annual_supplements','annual-supplements-ajax','annual_supplement'),('bills','bills-ajax','bill'),('guidelines','guidelines-ajax','guideline'),('parliamentary_resolutions','bills-specific-resolutions','parliamentary_resolution'),('international_instruments','bills-international-resolutions','international_instrument')]
 STOP=set('the and for with from that this shall which under what does how are law legal tanzania tanzanian act section please was were have has any not may all such than their been being'.split())
 def now():return datetime.now(timezone.utc).isoformat()
@@ -27,6 +27,7 @@ def prefix(word):
 class Rebuild:
  def __init__(self,endpoint,secret_file,database):
   if not endpoint.startswith('https://locke-corpus.') or urlparse(endpoint).hostname!='locke-corpus.ivogeraldladjr.workers.dev':raise ValueError('Unexpected gateway')
+  self.delta_publish=False
   self.endpoint=endpoint.rstrip('/');self.secret=os.environ.get('LOCKE_CORPUS_INGEST_TOKEN') or json.loads(pathlib.Path(secret_file).read_text())['ingest_token']
   self.client=httpx.Client(timeout=httpx.Timeout(120,connect=15),headers={'user-agent':'LOCKE/0.7 governed-corpus-rebuild'})
   self.db=sqlite3.connect(database,check_same_thread=False,timeout=60);self.lock=threading.Lock()
@@ -51,7 +52,7 @@ class Rebuild:
     r.raise_for_status();body=bytearray()
     for b in r.iter_bytes():
      body.extend(b)
-     if len(body)>MAX_BYTES:raise ValueError('Source exceeds 32 MiB limit')
+     if len(body)>MAX_BYTES:raise ValueError('Source exceeds 96 MiB limit')
     return bytes(body),r.headers.get('content-type','application/octet-stream')
   raise RuntimeError('Source unavailable')
  def discover(self,j,external,record):
@@ -63,18 +64,23 @@ class Rebuild:
     p=pathlib.Path(d)/'source.pdf';p.write_bytes(raw)
     result=subprocess.run(['pdftotext','-layout',str(p),'-'],capture_output=True,timeout=90,check=True)
     pages=result.stdout.decode('utf-8',errors='strict').split('\f')
-    if sum(len(x.strip()) for x in pages)<120:
-     info=subprocess.run(['pdfinfo',str(p)],capture_output=True,text=True,timeout=15,check=True)
-     count=int(re.search(r'^Pages:\s+(\d+)',info.stdout,re.M).group(1))
-     if count>250:raise ValueError('Scanned document exceeds bounded OCR page limit')
-     pages=[];ocr_started=time.monotonic()
-     for page in range(1,count+1):
-      if time.monotonic()-ocr_started>180:raise ValueError('Scanned document exceeded OCR time budget; retained for retry')
+    info=subprocess.run(['pdfinfo',str(p)],capture_output=True,text=True,timeout=15,check=True)
+    count=int(re.search(r'^Pages:\s+(\d+)',info.stdout,re.M).group(1))
+    if count>1000:raise ValueError('Document exceeds bounded OCR page limit')
+    pages=(pages+['']*count)[:count]
+    scan_pages=[i for i,text in enumerate(pages) if len(text.strip())<120]
+    doc['source_page_count']=count;doc['ocr_page_count']=len(scan_pages)
+    if scan_pages:
+     ocr_started=time.monotonic()
+     for index in scan_pages:
+      if time.monotonic()-ocr_started>1800:raise ValueError('Scanned document exceeded OCR time budget; retained for retry')
       image=pathlib.Path(d)/'page'
-      subprocess.run(['pdftoppm','-f',str(page),'-l',str(page),'-r','130','-singlefile','-png',str(p),str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=45,check=True)
-      ocr=subprocess.run(['tesseract',str(image)+'.png','stdout','-l','eng','--psm','3'],capture_output=True,timeout=60,check=True)
-      pages.append(ocr.stdout.decode('utf-8'));pathlib.Path(str(image)+'.png').unlink(missing_ok=True)
-     doc['parser_version']='tesseract-eng-130dpi-v1';doc['ocr_requires_verification']=True
+      subprocess.run(['pdftoppm','-f',str(index+1),'-l',str(index+1),'-r','130','-singlefile','-png',str(p),str(image)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=45,check=True)
+      ocr=subprocess.run(['tesseract',str(image)+'.png','stdout','-l','eng','--psm','3'],capture_output=True,timeout=120,check=True,env={**os.environ,'OMP_THREAD_LIMIT':'1'})
+      pages[index]=ocr.stdout.decode('utf-8');pathlib.Path(str(image)+'.png').unlink(missing_ok=True)
+     doc['parser_version']='mixed-pdf-tesseract-eng-130dpi-v2';doc['ocr_requires_verification']=True
+    doc['extracted_page_count']=sum(bool(text.strip()) for text in pages)
+    doc['empty_page_count']=count-doc['extracted_page_count']
    chunks=[]
    for page,text in enumerate(pages,1):
     for i,piece in enumerate(upstream.chunk_text(text)):
@@ -88,7 +94,11 @@ class Rebuild:
    chunks=[{'content':piece,'page_number':None,'source_node_ref':f'text/{i}'} for i,piece in enumerate(upstream.chunk_text(upstream.strip_markup(text)))]
   if not chunks or sum(len(x['content']) for x in chunks)<120:raise ValueError('No usable source text; OCR required')
   doc['chunks']=chunks
-  receipt=self.call('/ingest',data={'document':json.dumps(doc,ensure_ascii=False)},files={'raw':('source',raw,mime.split(';')[0])})
+  if len(raw)>32*1024*1024:
+   verified=self.call('/raw-source','PUT',params={'jurisdiction':doc['jurisdiction_code'],'external_id':doc['external_id'],'canonical_url':doc['canonical_url'],'sha256':doc['content_sha256'],'bytes':str(len(raw))},content=raw)
+   if not verified.get('verified'):raise ValueError('Large source verification failed')
+   receipt=self.call('/ingest-extracted',json=doc)
+  else:receipt=self.call('/ingest',data={'document':json.dumps(doc,ensure_ascii=False)},files={'raw':('source',raw,mime.split(';')[0])})
   if not receipt.get('verified') or receipt.get('content_sha256')!=doc['content_sha256']:raise ValueError('Remote verification mismatch')
   with self.lock:
    self.db.execute('INSERT OR REPLACE INTO documents VALUES (?,?,?,?,?,?,?,?)',(receipt['id'],doc['jurisdiction_code'],doc['external_id'],doc['content_sha256'],receipt['document_key'],doc['title'],len(chunks),json.dumps(doc,ensure_ascii=False)))
@@ -98,7 +108,8 @@ class Rebuild:
   try:
    with self.lock:done=self.db.execute('SELECT title FROM documents WHERE jurisdiction=? AND external_id=?',(doc['jurisdiction_code'],doc['external_id'])).fetchone()
    if done and done[0].strip():return
-   raw,mime=self.fetch(doc.get('source_url',doc['canonical_url']),allowed);self.ingest(doc,raw,mime)
+   raw,mime=self.fetch(doc.get('source_url',doc['canonical_url']),allowed);receipt=self.ingest(doc,raw,mime)
+   if self.delta_publish:self.call('/delta-publish',json={'id':receipt['id'],'document_key':receipt['document_key']})
   except Exception as e:
    with self.lock:self.db.execute('INSERT INTO errors VALUES (?,?,?,?)',(doc['jurisdiction_code'],doc['external_id'],type(e).__name__+': '+str(e)[:160],now()));self.db.commit()
  def batch(self,docs,allowed,workers):

@@ -36,6 +36,35 @@ async function ingest(request,env){
  const check=await env.CORPUS.get(docKey);if(!check||await sha(await check.arrayBuffer())!==bodyHash)return json({error:'Extracted body verification failed'},502);
  return json({id,document_key:docKey,content_sha256:hash,extracted_sha256:bodyHash,bytes:raw.size,chunks:document.chunks.length,verified:true});
 }
+// Large public PDFs bypass multipart buffering and are verified as complete streams.
+async function ingestRawStream(request,env){
+ const q=new URL(request.url).searchParams,j=q.get('jurisdiction'),external=q.get('external_id'),hash=q.get('sha256'),size=Number(q.get('bytes'));
+ const source=SOURCES[j];const url=new URL(q.get('canonical_url')||'https://invalid.invalid');
+ if(!source||url.protocol!=='https:'||url.hostname!==source.host||url.username||url.password||!external||external.length>500||! /^[a-f0-9]{64}$/.test(hash||'')||!Number.isInteger(size)||size<1||size>96*1024*1024||Number(request.headers.get('content-length'))!==size||!request.body)return json({error:'Invalid bounded source stream'},400);
+ if(j==='CA'&&!url.pathname.startsWith('/justicecanada/laws-lois-xml/'))return json({error:'Unapproved Canada source'},400);
+ const id=await sha(new TextEncoder().encode(j+':'+external)),key=`raw/${j}/${id}/${hash}`;
+ await env.CORPUS.put(key,request.body,{sha256:hash,httpMetadata:{contentType:'application/pdf',cacheControl:'private, no-store'}});
+ const remote=await env.CORPUS.get(key),digest=new crypto.DigestStream('SHA-256');
+ if(!remote||remote.size!==size)return json({error:'Source stream size mismatch'},502);
+ await remote.body.pipeTo(digest);const actual=Array.from(new Uint8Array(await digest.digest),x=>x.toString(16).padStart(2,'0')).join('');
+ if(actual!==hash)return json({error:'Source stream verification failed'},502);
+ await env.CORPUS.put(`verification/${id}/${hash}.json`,JSON.stringify({id,key,sha256:hash,bytes:size}));
+ return json({id,key,content_sha256:hash,bytes:size,verified:true});
+}
+async function ingestExtracted(request,env){
+ const text=await request.text();if(text.length>12*1024*1024)return json({error:'Extracted body too large'},413);
+ const document=JSON.parse(text),source=SOURCES[document.jurisdiction_code];
+ if(!source||typeof document.external_id!=='string'||!document.external_id||! /^[a-f0-9]{64}$/.test(document.content_sha256||'')||!Array.isArray(document.chunks)||!document.chunks.length||document.chunks.length>3000)return json({error:'Invalid extracted document'},400);
+ const url=new URL(document.canonical_url);if(url.protocol!=='https:'||url.hostname!==source.host||url.username||url.password)return json({error:'Unapproved source URL'},400);
+ for(const c of document.chunks)if(typeof c.content!=='string'||!c.content.trim()||c.content.length>12000||!c.source_node_ref)return json({error:'Invalid passage'},400);
+ const id=await sha(new TextEncoder().encode(document.jurisdiction_code+':'+document.external_id)),verification=await read(env,`verification/${id}/${document.content_sha256}.json`);
+ if(!verification||!await env.CORPUS.head(verification.key))return json({error:'Complete source-byte verification required'},409);
+ const stored={...document,id,raw_r2_key:verification.key,source_name:source.name,attribution:source.attribution,indexed_at:new Date().toISOString()};
+ const body=JSON.stringify(stored),bodyHash=await sha(new TextEncoder().encode(body)),key=`documents/${id}/${document.content_sha256}/${bodyHash}.json`;
+ await env.CORPUS.put(key,body,{httpMetadata:{contentType:'application/json',cacheControl:'private, no-store'}});
+ const check=await env.CORPUS.get(key);if(!check||await sha(await check.arrayBuffer())!==bodyHash)return json({error:'Extracted body verification failed'},502);
+ return json({id,document_key:key,content_sha256:document.content_sha256,extracted_sha256:bodyHash,chunks:document.chunks.length,verified:true});
+}
 export function validateWatchlist(documents){
  if(!Array.isArray(documents)||!documents.length||documents.length>100)throw new Error('Watchlist must contain 1 to 100 priority sources');
  for(const doc of documents){for(const field of ['canonical_url','source_url']){const url=new URL(doc[field]);if(doc.jurisdiction_code!=='TZ'||url.protocol!=='https:'||url.hostname!==SOURCES.TZ.host||url.username||url.password||url.port)throw new Error('Unapproved watchlist source');}if(!/^[a-f0-9]{64}$/.test(doc.content_sha256)||typeof doc.external_id!=='string'||!doc.title)throw new Error('Invalid watchlist metadata');}
@@ -91,13 +120,16 @@ export default {async scheduled(controller,env,ctx){ctx.waitUntil(refreshTick(en
  try{
  const path=new URL(request.url).pathname;
  if(path==='/health')return json({service:'locke-corpus',private_storage:true});
- if(path==='/stats'){const m=await read(env,'search/current.json');return m?json(m):json({documents:0,chunks:0,jurisdictions:[],state:'building'});}
+ if(path==='/stats'){const m=await read(env,'search/current.json');const assessment=await read(env,'coverage/current.json');return m?json({...m,assessment}):json({documents:0,chunks:0,jurisdictions:[],state:'building'});}
  if(path==='/changes'&&request.method==='GET'){if(request.headers.get('authorization')!==`Bearer ${env.SEARCH_TOKEN}`||!env.SEARCH_TOKEN)return json({error:'Unauthorized'},401);return json(await read(env,'refresh/state.json')||{coverage:0,events:[]});}
  if(path==='/search'&&request.method==='POST'){
   if(!env.SEARCH_TOKEN||request.headers.get('authorization')!==`Bearer ${env.SEARCH_TOKEN}`)return json({error:'Unauthorized'},401);
   return await search(request,env);
  }
  if(!env.INGEST_TOKEN||request.headers.get('authorization')!==`Bearer ${env.INGEST_TOKEN}`)return json({error:'Unauthorized'},401);
+ if(path==='/raw-source'&&request.method==='PUT')return await ingestRawStream(request,env);
+ if(path==='/ingest-extracted'&&request.method==='POST')return await ingestExtracted(request,env);
+ if(path==='/coverage'&&request.method==='PUT'){const body=await request.text();if(body.length>128000)return json({error:'Assessment too large'},413);const input=JSON.parse(body);if(input.all_law_complete!==false||input.jurisdiction!=='TZ'||!Array.isArray(input.collections))return json({error:'Bounded catalogue assessment required'},400);await env.CORPUS.put('coverage/current.json',body);return json({saved:true});}
  if(path==='/watchlist'&&request.method==='PUT'){const input=await request.json();const documents=validateWatchlist(input.documents);await env.CORPUS.put('refresh/watchlist.json',JSON.stringify({documents}));return json({saved:documents.length});}
  if(path==='/refresh-tick'&&request.method==='POST')return json(await refreshTick(env));
  if(path==='/delta-publish'&&request.method==='POST')return await publishDelta(request,env);

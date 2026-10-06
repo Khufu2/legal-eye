@@ -31,3 +31,18 @@ test('Portal rejects invented quotes, foreign resources and whitespace-only cita
   assert.equal(verifyPublishedCitations([cite], sources)[0].page, null);
   for (const bad of [{ ...cite, quote: 'within 60 days' }, { ...cite, resource_id: 'private' }, { ...cite, quote: '  ' }]) assert.throws(() => verifyPublishedCitations([bad], sources), /unsupported/);
 });
+test('Outlook refuses stale email content before mutation',async()=>{
+ const {checkedOutlookReply}=await import('../lib/legal/office-host.ts');let writes=0;
+ const office=host({body:{getAsync(type,done){done({status:'ok',value:'Different message'});}},displayReplyFormAsync(){writes++;}});
+ await assert.rejects(checkedOutlookReply(office,'Original message','Reply'),/email changed/);assert.equal(writes,0);
+});
+test('Word tracked replacement restores the original tracking mode',async()=>{
+ const doc={changeTrackingMode:'Off',load(){},getSelection:()=>({text:'Original',load(){},insertText(){assert.equal(doc.changeTrackingMode,'TrackAll');}})};
+ await replaceWordSelection({run:fn=>fn({document:doc,sync:async()=>{}})},'Original','Replacement',true);
+ assert.equal(doc.changeTrackingMode,'Off');
+});
+test('Word restores tracking mode even when replacement fails',async()=>{
+ const doc={changeTrackingMode:'TrackMineOnly',load(){},getSelection:()=>({text:'Original',load(){},insertText(){throw new Error('Protected document');}})};
+ await assert.rejects(replaceWordSelection({run:fn=>fn({document:doc,sync:async()=>{}})},'Original','Replacement',true),/Protected/);
+ assert.equal(doc.changeTrackingMode,'TrackMineOnly');
+});

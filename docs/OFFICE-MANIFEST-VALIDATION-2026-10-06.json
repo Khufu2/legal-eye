@@ -1,0 +1,18 @@
+{
+  "word": {
+    "manifest_sha256": "f712d00faea9c950091f6651bd39a59c6b60152b4ef47cd3605514d6714a289b",
+    "service_status": "Accepted",
+    "errors": [],
+    "warnings": [],
+    "service_checked_at": "2026-10-06T12:37:15.0515523+00:00",
+    "native_host_acceptance": "pending"
+  },
+  "outlook": {
+    "manifest_sha256": "464194715e4a52caee2b2a26a8b48b9c2e84fff777d1f614d6ddcb6df370294f",
+    "service_status": "Accepted",
+    "errors": [],
+    "warnings": [],
+    "service_checked_at": "2026-10-06T12:37:28.6912561+00:00",
+    "native_host_acceptance": "pending"
+  }
+}
