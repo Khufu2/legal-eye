@@ -7,7 +7,14 @@ const SOURCES = {
  EU: {host:'eur-lex.europa.eu',name:'EUR-Lex',attribution:'Source: EUR-Lex. Excludes protected third-party material.'},
 };
 const PARLIAMENT_RESOLUTION_URL='https://www.parliament.go.tz/uploads/documents/sw-1738920470-1569484644-AZIMIO%20LA%20MARRAKESH.pdf';
+export function approvedSource(jurisdiction,url,externalId){
+ const source=SOURCES[jurisdiction];
+ if(!source||url.protocol!=='https:'||url.username||url.password||url.port)return false;
+ if(url.hostname===source.host)return true;
+ return jurisdiction==='TZ'&&url.hostname==='emaktaba.judiciary.go.tz'&&typeof externalId==='string'&&/^judiciary:[a-z0-9]+$/.test(externalId)&&url.pathname==='/judgements/'+externalId.slice(10)&&!url.search&&!url.hash;
+}
 export function provenance(document,source=SOURCES[document.jurisdiction_code]){
+ if(document.jurisdiction_code==='TZ'&&document.external_id?.startsWith('judiciary:')&&approvedSource('TZ',new URL(document.canonical_url),document.external_id))return {source_name:'Judiciary of Tanzania · e-Maktaba',attribution:'Source: Judiciary of Tanzania, published judgment PDF. Editorial summaries and authority treatment are not certified.'};
  if(document.jurisdiction_code==='TZ'&&document.external_id==='oag:parliamentary_resolutions:19'&&document.source_url===PARLIAMENT_RESOLUTION_URL)return {source_name:'Parliament of Tanzania',attribution:'Source: Parliament of Tanzania, Resolution 09/2019 adopted 11 September 2019. OAG catalogue PDF unavailable; official Parliament copy.'};
  return {source_name:source.name,attribution:source.attribution};
 }
@@ -24,7 +31,7 @@ async function ingest(request,env){
  const document=JSON.parse(metadata);
  const source=SOURCES[document.jurisdiction_code];
  if(!source||!(raw instanceof File)||raw.size>32*1024*1024||!raw.size)return json({error:'Invalid source or payload'},400);
- const url=new URL(document.canonical_url); if(url.protocol!=='https:'||url.hostname!==source.host||url.username||url.password)return json({error:'Unapproved source URL'},400);
+ const url=new URL(document.canonical_url); if(!approvedSource(document.jurisdiction_code,url,document.external_id))return json({error:'Unapproved source URL'},400);
  if(document.jurisdiction_code==='CA'&&!url.pathname.startsWith('/justicecanada/laws-lois-xml/'))return json({error:'Unapproved Canada source'},400);
  if(typeof document.external_id!=='string'||!document.external_id||!Array.isArray(document.chunks)||!document.chunks.length||document.chunks.length>3000)return json({error:'Missing extracted passages'},400);
  for(const c of document.chunks)if(typeof c.content!=='string'||!c.content.trim()||c.content.length>12000||!c.source_node_ref)return json({error:'Invalid passage'},400);
@@ -45,7 +52,7 @@ async function ingest(request,env){
 async function ingestRawStream(request,env){
  const q=new URL(request.url).searchParams,j=q.get('jurisdiction'),external=q.get('external_id'),hash=q.get('sha256'),size=Number(q.get('bytes'));
  const source=SOURCES[j];const url=new URL(q.get('canonical_url')||'https://invalid.invalid');
- if(!source||url.protocol!=='https:'||url.hostname!==source.host||url.username||url.password||!external||external.length>500||! /^[a-f0-9]{64}$/.test(hash||'')||!Number.isInteger(size)||size<1||size>96*1024*1024||Number(request.headers.get('content-length'))!==size||!request.body)return json({error:'Invalid bounded source stream'},400);
+ if(!source||!approvedSource(j,url,external)||!external||external.length>500||! /^[a-f0-9]{64}$/.test(hash||'')||!Number.isInteger(size)||size<1||size>96*1024*1024||Number(request.headers.get('content-length'))!==size||!request.body)return json({error:'Invalid bounded source stream'},400);
  if(j==='CA'&&!url.pathname.startsWith('/justicecanada/laws-lois-xml/'))return json({error:'Unapproved Canada source'},400);
  const id=await sha(new TextEncoder().encode(j+':'+external)),key=`raw/${j}/${id}/${hash}`;
  await env.CORPUS.put(key,request.body,{sha256:hash,httpMetadata:{contentType:'application/pdf',cacheControl:'private, no-store'}});
@@ -60,7 +67,7 @@ async function ingestExtracted(request,env){
  const text=await request.text();if(text.length>12*1024*1024)return json({error:'Extracted body too large'},413);
  const document=JSON.parse(text),source=SOURCES[document.jurisdiction_code];
  if(!source||typeof document.external_id!=='string'||!document.external_id||! /^[a-f0-9]{64}$/.test(document.content_sha256||'')||!Array.isArray(document.chunks)||!document.chunks.length||document.chunks.length>3000)return json({error:'Invalid extracted document'},400);
- const url=new URL(document.canonical_url);if(url.protocol!=='https:'||url.hostname!==source.host||url.username||url.password)return json({error:'Unapproved source URL'},400);
+ const url=new URL(document.canonical_url);if(!approvedSource(document.jurisdiction_code,url,document.external_id))return json({error:'Unapproved source URL'},400);
  for(const c of document.chunks)if(typeof c.content!=='string'||!c.content.trim()||c.content.length>12000||!c.source_node_ref)return json({error:'Invalid passage'},400);
  const id=await sha(new TextEncoder().encode(document.jurisdiction_code+':'+document.external_id)),verification=await read(env,`verification/${id}/${document.content_sha256}.json`);
  if(!verification||!await env.CORPUS.head(verification.key))return json({error:'Complete source-byte verification required'},409);
@@ -117,7 +124,7 @@ async function search(request,env){
   const doc=await read(env,newer?.key||item.key);if(!doc||!scope.includes(doc.jurisdiction_code)||seen.has(doc.id))return;seen.add(doc.id);
   const ranked=doc.chunks.map((chunk,index)=>({chunk,index,score:rankPassage(chunk.content,query,weights)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||a.index-b.index).filter((hit,index,all)=>!all.slice(0,index).some(previous=>Math.abs(previous.index-hit.index)<=2)).slice(0,3);
   for(const hit of ranked){const adjacent=doc.chunks.slice(Math.max(0,hit.index-1),hit.index+2);hit.chunk={...hit.chunk,content:adjacent.map(c=>`[${c.page_number?'Page '+c.page_number:c.source_node_ref}]\n${c.content}`).join('\n\n')};}
-  for(const [passageRank,{chunk,index,score}] of ranked.entries())evidence.push({legal_document_id:doc.id,chunk_id:`${doc.id}:${index}`,title:doc.title,citation:doc.citation,content:chunk.content,page_number:chunk.page_number||null,source_node_ref:chunk.source_node_ref,start_offset:chunk.start_offset??null,end_offset:chunk.end_offset??null,canonical_url:doc.canonical_url,source_url:doc.source_url||doc.canonical_url,jurisdiction_code:doc.jurisdiction_code,document_type:doc.document_type,published_at:doc.published_at,retrieved_at:doc.retrieved_at,version_notice:doc.version_notice||'Currentness and amendments require verification',ocr_requires_verification:doc.ocr_requires_verification||false,content_sha256:doc.content_sha256,attribution:doc.attribution,source_kind:'cloudflare-r2',passage_rank:passageRank,retrieval_score:(item.score+score*10)*(doc.document_type==='bill'?0.1:1)});
+  for(const [passageRank,{chunk,index,score}] of ranked.entries())evidence.push({legal_document_id:doc.id,chunk_id:`${doc.id}:${index}`,title:doc.title,citation:doc.citation,court:doc.court,source_name:doc.source_name,content:chunk.content,page_number:chunk.page_number||null,source_node_ref:chunk.source_node_ref,start_offset:chunk.start_offset??null,end_offset:chunk.end_offset??null,canonical_url:doc.canonical_url,source_url:doc.source_url||doc.canonical_url,jurisdiction_code:doc.jurisdiction_code,document_type:doc.document_type,published_at:doc.published_at,retrieved_at:doc.retrieved_at,version_notice:doc.version_notice||'Currentness and amendments require verification',ocr_requires_verification:doc.ocr_requires_verification||false,content_sha256:doc.content_sha256,attribution:doc.attribution,source_kind:'cloudflare-r2',passage_rank:passageRank,retrieval_score:(item.score+score*10)*(doc.document_type==='bill'?0.1:1)});
  }));
  evidence.sort((a,b)=>a.passage_rank-b.passage_rank||b.retrieval_score-a.retrieval_score);
  return json({evidence:evidence.slice(0,Math.min(24,Number(input.limit)||24)),provider:'cloudflare-r2',as_of:manifest.as_of,generation:manifest.generation});

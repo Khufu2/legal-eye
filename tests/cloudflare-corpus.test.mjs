@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker,{terms,rankPassage} from '../scripts/cloudflare/corpus_worker.mjs';
+import worker,{terms,rankPassage,approvedSource,provenance} from '../scripts/cloudflare/corpus_worker.mjs';
+
+test('Judiciary ingestion requires the exact official host, document path and identifier',()=>{
+ const external='judiciary:cmuy314lc0evhob1drwj91v47';
+ const canonical='https://emaktaba.judiciary.go.tz/judgements/cmuy314lc0evhob1drwj91v47';
+ assert.equal(approvedSource('TZ',new URL(canonical),external),true);
+ for(const bad of ['https://emaktaba.judiciary.go.tz.evil.test/judgements/cmuy314lc0evhob1drwj91v47',canonical+'?redirect=elsewhere',canonical.replace('/judgements/','/private/'),canonical.replace('https:','http:')])assert.equal(approvedSource('TZ',new URL(bad),external),false);
+ assert.equal(approvedSource('TZ',new URL(canonical),'oag:acts:338'),false);
+ assert.equal(approvedSource('CA',new URL(canonical),external),false);
+ assert.match(provenance({jurisdiction_code:'TZ',external_id:external,canonical_url:canonical}).source_name,/Judiciary/);
+});
 
 test('gateway fails closed when secrets are missing or incorrect',async()=>{
  for(const [path,token] of [['/ingest','Bearer undefined'],['/search','Bearer undefined'],['/index','Bearer wrong']]){
