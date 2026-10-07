@@ -1,11 +1,11 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type ClientSession = { access_token: string; refresh_token?: string; expires_at?: number; user: { id: string; email?: string } };
+export type ClientSession = { access_token: string; refresh_token?: string; expires_at?: number; user: { id: string; email?: string }; organization_id?: string; role?: string };
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
 
-/** Separate sessions for Office and client portals; never substitute a shared demo identity. */
+/** Tab-scoped refreshable auth. Client portals use a separate storage key. */
 export function useClientSession(storageKey: string) {
   const [session, setSession] = useState<ClientSession | null>(null);
   const [sessionError, setSessionError] = useState('');
@@ -32,7 +32,7 @@ export function useClientSession(storageKey: string) {
         const data = await response.json();
         if (cancelled || generation.current !== revision) return;
         if (!response.ok) { commit(null); setSessionError('Your session expired. Please sign in again.'); return; }
-        commit({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: data.expires_at || Math.floor(Date.now() / 1000) + data.expires_in, user: data.user });
+        commit({ ...session, access_token: data.access_token, refresh_token: data.refresh_token, expires_at: data.expires_at || Math.floor(Date.now() / 1000) + data.expires_in, user: data.user });
       } catch {
         if (!cancelled && generation.current === revision) { commit(null); setSessionError('Session renewal failed. Please reconnect and sign in.'); }
       }

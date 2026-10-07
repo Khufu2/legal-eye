@@ -50,7 +50,7 @@ async function wordSelection() {
 function outlookItemText(){return readOutlookText(window.Office);}
 
 export function LegalEyeOffice({host}:{host:Host}){
-  const storageKey="legal-eye-office-session";
+  const storageKey="legal-eye-session";
   const {session,acceptSession,signOut:revokeSession,sessionError,sessionLoading}=useClientSession(storageKey);
   const captured=useRef("");
   const [resultKind,setResultKind]=useState("reply");
