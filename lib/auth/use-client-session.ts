@@ -9,6 +9,7 @@ const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
 export function useClientSession(storageKey: string) {
   const [session, setSession] = useState<ClientSession | null>(null);
   const [sessionError, setSessionError] = useState('');
+  const [sessionLoading,setSessionLoading]=useState(true);
   const generation = useRef(0);
   const commit = useCallback((next: ClientSession | null) => {
     generation.current++;
@@ -17,7 +18,7 @@ export function useClientSession(storageKey: string) {
   }, [storageKey]);
   useEffect(() => {
     // Discard legacy, non-refreshable localStorage bearer tokens.
-    try { localStorage.removeItem(storageKey); const saved = sessionStorage.getItem(storageKey); setSession(saved ? JSON.parse(saved) : null); } catch { setSession(null); }
+    try { localStorage.removeItem(storageKey); const saved = sessionStorage.getItem(storageKey); setSession(saved ? JSON.parse(saved) : null); } catch { setSession(null); } finally {setSessionLoading(false);}
     return () => { generation.current++; };
   }, [storageKey]);
   useEffect(() => {
@@ -53,5 +54,5 @@ export function useClientSession(storageKey: string) {
       catch { setSessionError('Signed out here. Server revocation could not be confirmed; use account recovery to revoke other sessions if needed.'); }
     }
   }, [session, commit]);
-  return { session, acceptSession, signOut, sessionError };
+  return { session, acceptSession, signOut, sessionError, sessionLoading };
 }

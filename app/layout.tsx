@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#122720",
+  themeColor: "#12110f",
   colorScheme: "light dark",
   width: "device-width",
   initialScale: 1,
@@ -44,8 +44,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{__html:"try{var t=localStorage.getItem('legal-eye-theme-v3');document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}"}}/>
         <meta name="codex-preview" content="development" />
       </head>
       <body className="antialiased">
