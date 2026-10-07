@@ -120,7 +120,7 @@ input[type=checkbox]{accent-color:var(--primary);width:15px;height:15px;flex-shr
 .home-hero-brand svg{width:20px;height:20px}
 .home-hero h1{font:400 clamp(30px,3vw,40px)/1.2 var(--font-serif);letter-spacing:-.035em;margin:0 0 30px;color:var(--ink);text-align:center}
 .home-subtitle{font-size:13px;color:var(--quiet);margin:0 0 24px}
-.home-composer{background:var(--card);border:1px solid var(--input);border-radius:10px;padding:20px 18px 14px;max-width:none;margin:0;box-shadow:0 2px 5px #00000004;text-align:left}
+.home-composer{background:var(--card);border:1px solid var(--input);border-radius:28px;padding:20px 18px 14px;max-width:none;margin:0;box-shadow:0 2px 5px #00000004;text-align:left}
 .home-composer textarea{display:block;width:100%;min-height:100px;max-height:280px;resize:vertical;font:400 14px/1.7 var(--font-sans);color:var(--ink);background:transparent;border:0;padding:0;outline:none}
 .home-composer textarea::placeholder{color:#92908b}
 .composer-controls{display:flex;align-items:center;gap:8px;padding-top:12px;border:0}
@@ -862,3 +862,26 @@ input[type=checkbox]{accent-color:var(--primary);width:15px;height:15px;flex-shr
 @media(max-width:760px){.evidence-panel{position:fixed;inset:60px 0 0 auto;z-index:60;width:min(92vw,380px);height:calc(100dvh - 60px);margin:0;border-radius:0;border-left:1px solid var(--line)}}
 
 .desk-heading>button{font-size:11px;color:var(--quiet);padding:4px 0}.desk-heading>button:hover{color:var(--ink);text-decoration:underline}
+
+/* Homepage: soft corners and a compact, progressively disclosed guide. */
+.cathedral-home .desk-card{border-radius:20px}
+.cathedral-home .composer-controls>button,.cathedral-home .question-examples button,.cathedral-home .source-shortcuts button{border-radius:999px}
+.cathedral-home .jurisdiction-picker{border-radius:18px}
+.cathedral-home .recent-research>button{border-radius:14px;padding-left:10px;padding-right:10px}
+.cathedral-home .recent-research>button:hover{background:var(--hover)}
+.locke-guide{margin-top:32px}
+.guide-start{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.guide-start article,.guide-details{border:1px solid var(--line);border-radius:20px;background:var(--card)}
+.guide-start article{padding:20px;display:flex;flex-direction:column}
+.guide-start small{font-size:10px;letter-spacing:.06em;color:var(--quiet)}
+.locke-guide h3{font-size:13px;font-weight:550;margin:12px 0 8px}
+.locke-guide p{font-size:12px;line-height:1.75;color:var(--quiet);margin:0 0 14px}
+.locke-guide button,.locke-guide a{display:inline-flex;align-items:center;gap:6px;font-size:11px;text-align:left;color:var(--ink);margin-top:auto;text-decoration:underline;text-underline-offset:4px}
+.locke-guide button:focus-visible,.guide-details summary:focus-visible,.locke-guide a:focus-visible{outline:2px solid var(--ring);outline-offset:5px;border-radius:4px}
+.guide-details{margin-top:12px;padding:18px 20px}
+.guide-details summary{cursor:pointer;font-size:12px;font-weight:500}
+.guide-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:18px}
+.guide-tools article{border-top:1px solid var(--line);padding-top:8px}
+.guide-office{border-top:1px solid var(--line);margin-top:22px;padding-top:8px}
+.locke-guide .guide-note{margin:14px 4px 0;font-size:11px}
+@media(max-width:700px){.guide-start,.guide-tools{grid-template-columns:1fr}.locke-guide .desk-heading{align-items:flex-start;gap:8px;flex-direction:column}.guide-start article{padding:18px}}
