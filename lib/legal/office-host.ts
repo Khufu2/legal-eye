@@ -26,15 +26,15 @@ export function draftOutlookReply(office: OfficeHost, text: string): Promise<voi
     const timeout=setTimeout(()=>reject(new Error('Outlook insertion timed out. Check the draft before retrying.')),15000);
     const done = (result: AsyncResult) => {clearTimeout(timeout);return result.status === office.AsyncResultStatus.Succeeded
       ? resolve() : reject(new Error(result.error?.message || 'Outlook could not insert the draft'));};
-    if (item?.displayReplyFormAsync) {
-      item.displayReplyFormAsync({ htmlBody: escapeReplyHtml(text) }, done);
-    } else if (item?.body?.setSelectedDataAsync) {
+    if (item?.body?.setSelectedDataAsync) {
       // Compose mode: insert at the cursor, preserving the existing message and signature.
       item.body.setSelectedDataAsync(text, { coercionType: office.CoercionType.Text }, done);
+    } else if (item?.displayReplyFormAsync) {
+      item.displayReplyFormAsync({ htmlBody: escapeReplyHtml(text) }, done);
     } else {clearTimeout(timeout);reject(new Error('This Outlook version does not support reply insertion. Copy the reviewed text into your draft.'));}
   });
 }
-export async function replaceWordSelection(word: any, expected: string, text: string, trackChanges = false) {
+export async function replaceWordSelection(word: any, expected: string, text: string, trackChanges = false, location: 'Replace' | 'After' = 'Replace') {
   if (!word) throw new Error('Open this taskpane inside Microsoft Word.');
   if (!expected.trim()) throw new Error('Load the Word selection before replacing it.');
   await word.run(async (context: any) => {
@@ -46,9 +46,9 @@ export async function replaceWordSelection(word: any, expected: string, text: st
       context.document.load('changeTrackingMode');
       await context.sync();
       const previous=context.document.changeTrackingMode;
-      try{context.document.changeTrackingMode='TrackAll';await context.sync();selection.insertText(text,'Replace');await context.sync();}
+      try{context.document.changeTrackingMode='TrackAll';await context.sync();selection.insertText(text,location);await context.sync();}
       finally{context.document.changeTrackingMode=previous;await context.sync();}
-    }else{selection.insertText(text, 'Replace');await context.sync();}
+    }else{selection.insertText(text, location);await context.sync();}
   });
 }
 

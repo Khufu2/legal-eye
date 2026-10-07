@@ -46,3 +46,14 @@ test('Word restores tracking mode even when replacement fails',async()=>{
  await assert.rejects(replaceWordSelection({run:fn=>fn({document:doc,sync:async()=>{}})},'Original','Replacement',true),/Protected/);
  assert.equal(doc.changeTrackingMode,'TrackMineOnly');
 });
+
+test('Outlook compose takes priority even if a host exposes reply APIs',async()=>{
+ let inserted='',replied=false;
+ await draftOutlookReply(host({body:{setSelectedDataAsync(text,options,done){inserted=text;done({status:'ok'});}},displayReplyFormAsync(){replied=true;}}),'Reviewed draft');
+ assert.equal(inserted,'Reviewed draft');assert.equal(replied,false);
+});
+test('Word can insert after the captured selection without replacing it',async()=>{
+ let location;
+ await replaceWordSelection({run:fn=>fn({document:{getSelection:()=>({text:'Original',load(){},insertText(text,where){location=where;}})},sync:async()=>{}})},'Original','New text',false,'After');
+ assert.equal(location,'After');
+});
