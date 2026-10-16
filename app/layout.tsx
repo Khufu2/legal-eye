@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/service-worker-register";
+import { LockeTelemetry } from "@/components/locke-telemetry";
 import "./globals.css";
 import "./workspace.css";
 
@@ -51,6 +52,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <ServiceWorkerRegister />
+        <LockeTelemetry />
         {children}
       </body>
     </html>

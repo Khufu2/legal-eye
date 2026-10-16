@@ -1,3 +1,4 @@
+import { track } from '../telemetry.ts';
 export type AuthFields = { email?: string; password?: string; firm?: string; confirm?: string };
 
 export function validateAuthFields(input: { email?: string; password?: string; signup?: boolean; firm?: string; requireFirm?: boolean; confirm?: string }): AuthFields {
@@ -55,6 +56,19 @@ export function authErrorMessage(error: unknown, status?: number): string {
 }
 
 export async function authRequest(url: string, init: RequestInit): Promise<Response> {
-  try { return await fetch(url, { ...init, signal: AbortSignal.timeout(20_000) }); }
-  catch (error) { throw new Error(authErrorMessage(error)); }
+  const path=new URL(url).pathname;
+  const stage=path.endsWith('/recover')?'recovery_request':path.endsWith('/signup')?'signup':path.endsWith('/resend')?'confirmation':path.endsWith('/user')&&init.method==='PUT'?'recovery_update':path.includes('/rest/')||path.endsWith('/user')?'workspace':'signin';
+  const started=Date.now(),controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),20_000);
+  track('locke_auth_attempted',{stage});
+  try {
+    const response=await fetch(url,{...init,signal:controller.signal});
+    const properties:Record<string,string|number>={stage,status:response.status,duration_ms:Date.now()-started};
+    if(!response.ok){const data=await response.clone().json().catch(()=>({}));properties.code=String(data.code||data.error_code||'unknown');track(stage==='recovery_request'?'locke_recovery_request_failed':stage==='recovery_update'?'locke_recovery_failed':'locke_auth_failed',properties);}
+    else if(stage==='recovery_request')track('locke_recovery_requested',properties);
+    return response;
+  } catch (error) {
+    track(stage==='recovery_request'?'locke_recovery_request_failed':'locke_auth_failed',{stage,code:controller.signal.aborted?'timeout':'network',duration_ms:Date.now()-started});
+    throw new Error(authErrorMessage(error));
+  } finally {clearTimeout(timer);}
 }
