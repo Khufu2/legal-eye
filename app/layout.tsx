@@ -5,12 +5,13 @@ import "./globals.css";
 import "./workspace.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://legal-eye-six.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.lockeslaw.xyz"),
   title: {
     default: "LOCKE — Legal intelligence.",
     template: "%s — LOCKE",
   },
   description: "Legal intelligence for research, drafting, review, comparison, workflows and private firm knowledge — grounded in source evidence.",
+  alternates: { canonical: "/" },
   applicationName: "LOCKE",
   appleWebApp: { capable: true, title: "LOCKE", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
@@ -48,7 +49,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{__html:"try{var t=localStorage.getItem('legal-eye-theme-v3');document.documentElement.dataset.theme=t==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}"}}/>
-        <meta name="codex-preview" content="development" />
+
       </head>
       <body className="antialiased">
         <ServiceWorkerRegister />
