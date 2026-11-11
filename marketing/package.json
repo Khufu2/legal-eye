@@ -1,0 +1,8 @@
+{
+  "name": "locke-marketing",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"const fs=require('node:fs');fs.mkdirSync('dist',{recursive:true});['index.html','robots.txt','sitemap.xml','favicon.svg'].forEach(f=>fs.copyFileSync(f,'dist/'+f))\""
+  }
+}
