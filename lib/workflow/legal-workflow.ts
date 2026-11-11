@@ -1,5 +1,6 @@
 import {FatalError,RetryableError,sleep} from 'workflow';
 import {executeWorkflowCommand} from '../legal/workflow-handler';
+import {workflowApiUrl} from '../legal/workflow';
 type AuthorizedRun={runId:string;organizationId:string;authorization:string};
 /** Vercel encrypts step inputs; no refresh token or service-role key is retained. */
 async function inspectRun(input:AuthorizedRun){
@@ -17,7 +18,7 @@ async function inspectRun(input:AuthorizedRun){
 }
 async function advanceStep(input:AuthorizedRun,nodeKey:string){
  'use step';
- const response=await executeWorkflowCommand(new Request('https://lockeslaw.sheenax.xyz/api/workflows',{method:'POST',headers:{authorization:input.authorization,'content-type':'application/json'},body:JSON.stringify({organization_id:input.organizationId,run_id:input.runId,command:'advance',expected_node_key:nodeKey})}));
+ const response=await executeWorkflowCommand(new Request(workflowApiUrl(),{method:'POST',headers:{authorization:input.authorization,'content-type':'application/json'},body:JSON.stringify({organization_id:input.organizationId,run_id:input.runId,command:'advance',expected_node_key:nodeKey})}));
  const data=await response.json();
  if(response.status===409)throw new RetryableError('Another execution owns the step lease',{retryAfter:'185s'});
  if([401,403,404].includes(response.status))throw new FatalError('Session expired or access revoked. Sign in and resume.');
