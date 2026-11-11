@@ -34,13 +34,16 @@ export function draftOutlookReply(office: OfficeHost, text: string): Promise<voi
     } else {clearTimeout(timeout);reject(new Error('This Outlook version does not support reply insertion. Copy the reviewed text into your draft.'));}
   });
 }
-export async function replaceWordSelection(word: any, expected: string, text: string, trackChanges = false, location: 'Replace' | 'After' = 'Replace') {
+export async function replaceWordSelection(word: any, expected: string, text: string, trackChanges = false, location: 'Replace' | 'After' = 'Replace', expectedDocument?: string) {
   if (!word) throw new Error('Open this taskpane inside Microsoft Word.');
   if (!expected.trim()) throw new Error('Load the Word selection before replacing it.');
   await word.run(async (context: any) => {
     const selection = context.document.getSelection();
     selection.load('text');
+    const body = expectedDocument === undefined ? null : context.document.body;
+    body?.load('text');
     await context.sync();
+    if(body && body.text !== expectedDocument) throw new Error('The document changed since review. Review the current document again.');
     if (selection.text !== expected) throw new Error('The Word selection changed. Select the original text again, or load the new selection and regenerate.');
     if(trackChanges){
       context.document.load('changeTrackingMode');

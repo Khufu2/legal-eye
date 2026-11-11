@@ -1,5 +1,6 @@
 import { legalOutputSchema } from "@/lib/legal/structured-output";
-import { legalModelName } from "@/lib/legal/model";
+import {billingGate} from "@/lib/legal/billing-server";
+import { legalModelFor } from "@/lib/legal/model";
 import { generateText, gateway, Output, ToolLoopAgent, tool, isStepCount } from "ai";
 import { z } from "zod";
 import {retrieveEvidence} from "@/lib/legal/retrieval";
@@ -8,7 +9,6 @@ export const maxDuration = 60;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-const modelName = legalModelName;
 
 const columnSchema = z.object({
   key: z.string().trim().min(1).max(80),
@@ -138,6 +138,9 @@ export async function POST(request: Request) {
     const input = requestSchema.parse(await request.json());
     const user = await authenticate(authorization, input.organization_id);
     if (!user) return json({ error: "Organization access denied" }, 403);
+    const billing = await billingGate(input.organization_id);
+    if (billing) return billing;
+    const modelName = legalModelFor(input.action);
     const providerOptions = { gateway: { user: user.id, tags: [`feature:${input.action}`, "product:legal-eye", "classification:confidential"] } };
 
     if (input.action === "extract_table") {

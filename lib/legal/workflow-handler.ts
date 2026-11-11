@@ -20,6 +20,7 @@ export async function executeWorkflowCommand(request:Request){
   const [workflow]=await db(`workflows?id=eq.${input.workflow_id}&organization_id=eq.${input.organization_id}`);if(!workflow)return reply({error:'Workflow not found'},404);
   const nodes=await db(`workflow_nodes?workflow_id=eq.${workflow.id}`) as WorkflowNode[],edges=await db(`workflow_edges?workflow_id=eq.${workflow.id}`) as WorkflowEdge[];
   const graph=orderWorkflow(nodes,edges);
+  if(graph.some(node=>node.node_type==='review')&&!input.document_ids.length)return reply({error:'Select a Ready document before starting this workflow.'},400);
   const [run]=await db('workflow_runs',{workflow_id:workflow.id,organization_id:input.organization_id,matter_id:workflow.matter_id,graph_version:workflow.version,status:'queued',started_by:user.id,input:{document_ids:input.document_ids,jurisdictions:input.jurisdictions,graph},checkpoint:{steps:[]},started_at:new Date().toISOString()});return reply({run});
  }
  if(!input.run_id)return reply({error:'Choose a run'},400);
