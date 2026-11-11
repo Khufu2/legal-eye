@@ -90,3 +90,22 @@ test('CLI-supplied bounded postings skip source tokenization and reject invalid 
  assert.equal((await worker.fetch(request({employment:12}),env)).status,200);
  assert.equal((await worker.fetch(request({employment:-1}),env)).status,400);
 });
+
+test('scheduled corpus refresh calls the production Locke API and records successful JSON',async()=>{
+ const watchlist={documents:[{jurisdiction_code:'TZ',external_id:'oag:acts:338',title:'Test Act',canonical_url:'https://oagmis.oag.go.tz/acts/338',source_url:'https://oagmis.oag.go.tz/acts/338',content_sha256:'a'.repeat(64)}]};
+ const writes=new Map();let called;
+ const env={INGEST_TOKEN:'test-secret',CORPUS:{
+  get:async key=>key==='refresh/watchlist.json'?{json:async()=>watchlist}:key==='refresh/state.json'?null:key==='search/delta.json'?null:null,
+  put:async(key,value)=>writes.set(key,JSON.parse(value))
+ }};
+ const originalFetch=globalThis.fetch;
+ globalThis.fetch=async(url,options)=>{called={url:String(url),options};return Response.json({state:'unchanged',checked:true});};
+ try{
+  const event=await (await import('../scripts/cloudflare/corpus_worker.mjs')).refreshTick(env);
+  assert.equal(called.url,'https://www.lockeslaw.xyz/api/corpus-refresh');
+  assert.equal(called.options.method,'POST');
+  assert.equal(called.options.headers.authorization,'Bearer test-secret');
+  assert.equal(event.state,'unchanged');
+  assert.equal(writes.get('refresh/state.json').events[0].title,'Test Act');
+ }finally{globalThis.fetch=originalFetch;}
+});
