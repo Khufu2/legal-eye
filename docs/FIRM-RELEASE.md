@@ -4,7 +4,7 @@
 
 The legal workflow library uses the existing workspace workflow runner and its lawyer approval checkpoint. Templates save into the firm's workspace and can be reviewed and customized. They are initial Locke templates. Record a named lawyer's acceptance and approved test cases for each template before describing it as lawyer-validated.
 
-The Word and Outlook manifests use the production domain. Word can review its document body against a firm Skill, show source quotations, and apply a single approved tracked replacement to an unchanged document. WordApi 1.4 is required for tracked changes. A separate Word file can be downloaded from a workflow run or review. Google Drive Picker can import a Google Doc as DOCX. To work in Google Docs, open a separate exported DOCX and use Suggesting mode for changes to the original. Google Docs API suggestion write-back is a Developer Preview and requires separate tenant acceptance.
+The Word and Outlook manifests use the production domain. Word can review its document body against a firm Skill, show source quotations, and apply a single approved tracked replacement to an unchanged document. WordApi 1.4 is required for tracked changes. A separate Word file can be downloaded from a workflow run or review. Google Drive Picker can import a Google Doc as DOCX. When the firm permits exports, enable NEXT_PUBLIC_LOCKE_GOOGLE_EXPORT_ENABLED and use the existing Google OAuth configuration to create a separate native Google Doc from the editor or a completed workflow. Users select the authorized destination account. Otherwise, open the exported DOCX in Drive. Use Suggesting mode for changes to an original. Google Docs API suggestion write-back is a Developer Preview and requires separate tenant acceptance.
 
 ## Packages
 
