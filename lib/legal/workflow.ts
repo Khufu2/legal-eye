@@ -13,3 +13,7 @@ export function orderWorkflow(nodes:WorkflowNode[],edges:WorkflowEdge[]) {
  return ordered;
 }
 export const needsApproval=(node:WorkflowNode)=>node.node_type==='human_checkpoint'||node.node_type==='decision';
+
+export function workflowApiUrl(appUrl=process.env.NEXT_PUBLIC_APP_URL||'https://www.lockeslaw.xyz'){
+ return new URL('/api/workflows',appUrl).toString();
+}
