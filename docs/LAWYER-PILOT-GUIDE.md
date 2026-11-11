@@ -1,8 +1,24 @@
 # LOCKE supervised lawyer evaluation
 
-Application: https://lockeslaw.sheenax.xyz/
+Application: https://www.lockeslaw.xyz/
 
-**Email onboarding and lawyer acceptance remain pending.** The 6 October replacement workspace passed authenticated API checks for private extraction and the main work flows. Browser onboarding, email verification/recovery and lawyer assessment still need completion. See `LAWYER-PILOT-STATUS-2026-10-06.md`; this checklist is not a release certificate.
+**Handoff scope — 11 November 2026.** This guide is for a supervised lawyer evaluation, not a release certificate for unrestricted client work. Use public-law research and fictional or de-identified files. Do not upload live client matters until the firm has completed its security, privacy, accuracy and operational review.
+
+## Current corpus snapshot
+
+The production overview reports **47,406 documents and 470,680 chunks** across five jurisdiction groups: Tanzania (5,621), Canada (5,861), United Kingdom (1,340), European Union (1,337) and Australia (33,247). The snapshot is dated **6 October 2026**. These counts describe indexed material, not complete or current law.
+
+Tanzania’s Office of the Attorney General downloadable catalogue is reconciled. The product does **not** claim all Tanzanian law: court/judgment coverage and amendment effects are unverified. The other jurisdiction snapshots are partial. There is no comprehensive Africa-wide or global corpus, and no verified citator coverage. Check current law and every cited passage against the official source.
+
+The scheduled refresh path was repaired and a priority Tanzania Act check succeeded at 20:30 UTC on 11 November. The 22-item watchlist checks one source per ten minutes; that verifies the refresh path, not the currentness or completeness of the full index.
+
+## What this pilot can and cannot establish
+
+Use the Agent and Workflows for **small, supervised tasks**. The agent is bounded, private-document extraction accepts at most 12 documents per request, and generated workflow graphs are limited to 20 nodes; background execution has a 64-step ceiling. Conditional workflow branches require an approved rule and currently block rather than execute. Large-batch throughput, autonomous filings/delivery and legal accuracy across jurisdictions are not established.
+
+Workflow graphs, saved runs, human checkpoints, retry/resume/cancel controls and background execution are implemented. The production callback path has just been corrected. This is not a substitute for running the lawyer acceptance script below. Require lawyer approval before using or sharing any generated work.
+
+For marketing, describe LOCKE as offering a **supervised lawyer evaluation** with stated jurisdiction and data limits. Do not claim an Africa-wide/global complete corpus, guaranteed current law, autonomous legal advice or production readiness. Billing is not configured in the app; a free pilot can be offered through controlled invitations while payments and usage entitlements are built separately.
 
 ## Account and workspace
 
