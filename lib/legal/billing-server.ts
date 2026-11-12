@@ -1,10 +1,24 @@
 import {z} from 'zod';
 
-const payment = z.object({
-  reference: z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/),
-  status: z.enum(['pending','completed','failed','voided','expired']),
-  amount: z.object({value:z.number().int().positive(),currency:z.string()}),
-});
+const reference=z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
+const positiveAmount=z.union([z.number(),z.string().regex(/^\d+$/).transform(Number)])
+  .pipe(z.number().int().positive());
+const money=z.object({value:positiveAmount,currency:z.string()});
+const payment=z.object({
+  reference,
+  status:z.enum(['pending','completed','failed','voided','expired']),
+  amount:z.union([money,positiveAmount]),
+  currency:z.string().optional(),
+}).transform(({amount,currency,...data})=>({
+  ...data,amount:typeof amount==='number'?{value:amount,currency:currency||''}:amount,
+}));
+const snippeErrors=z.enum(['unauthorized','insufficient_scope','validation_error','rate_limit_exceeded','PAY_001','payment_failed','not_found','conflict']);
+
+export class SnippeError extends Error {
+  constructor(readonly httpStatus:number,readonly code:string) {
+    super('Snippe request failed');
+  }
+}
 export const billingOrganization = z.string().uuid();
 export type BillingOrder = {
   id:string; organization_id:string; request_digest:string; status:string;
@@ -51,22 +65,60 @@ export async function billingGate(organizationId:string) {
   try{
     const access=await billingAccess(organizationId);
     if([access.paid_until,access.trial_ends_at].some(end=>end&&Date.parse(end)>Date.now()))return null;
-    return Response.json({error:'Start a workspace trial or renew Starter in Billing.'},{status:402});
+    return Response.json({error:'Start a workspace trial or renew Starter in Settings.'},{status:402});
   }catch{
     return Response.json({error:'Billing access could not be verified. Try again shortly.'},{status:503});
   }
 }
 
-export async function snippePayment(path:string, options?:{key:string;body:Record<string,unknown>}) {
-  const key=process.env.LOCKE_SNIPPE_API_KEY;
-  if(!key)throw new Error('Checkout is unavailable');
+async function snippeRequest(path:string, options?:{key:string;body:Record<string,unknown>}) {
+  const key=process.env.LOCKE_SNIPPE_API_KEY?.trim();
+  if(!key)throw new SnippeError(0,'missing_key');
   const response=await fetch('https://api.snippe.sh/v1/payments'+path,{
     method:options?'POST':'GET',headers:{authorization:'Bearer '+key,'content-type':'application/json',
       ...(options?{'Idempotency-Key':options.key}:{})},
     body:options?JSON.stringify(options.body):undefined,cache:'no-store',signal:AbortSignal.timeout(12000),
+  }).catch(()=>{throw new SnippeError(0,'network_error');});
+  const raw=await response.json().catch(()=>null);
+  if(!response.ok||raw?.status==='error'){
+    const code=snippeErrors.safeParse(raw?.error_code);
+    throw new SnippeError(response.status,code.success?code.data:'unknown_error');
+  }
+  return raw?.data;
+}
+
+export async function snippePayment(path:string) {
+  const result=payment.safeParse(await snippeRequest(path));
+  if(!result.success||!result.data.amount.currency)throw new SnippeError(200,'invalid_payment_status');
+  return result.data;
+}
+
+export async function createSnippePayment(options:{key:string;body:Record<string,unknown>}) {
+  // Creation only attaches the provider reference. Verified status is checked separately.
+  const result=z.object({reference}).safeParse(await snippeRequest('',options));
+  if(!result.success)throw new SnippeError(200,'missing_payment_reference');
+  return result.data.reference;
+}
+
+export async function findSnippePayment(order:BillingOrder) {
+  const list=z.object({items:z.array(z.object({
+    reference,metadata:z.object({locke_order_id:z.string().optional()}).nullish(),
+  }))}).safeParse(await snippeRequest('?limit=100'));
+  if(!list.success)throw new SnippeError(200,'invalid_payment_list');
+  const matches=list.data.items.filter(item=>item.metadata?.locke_order_id===order.id);
+  return matches.length===1?matches[0].reference:null;
+}
+
+export async function rejectUncreatedPayment(order:BillingOrder) {
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key=process.env.LOCKE_BILLING_SUPABASE_SERVICE_ROLE_KEY;
+  if(!url||!key)throw new Error('Billing database is unavailable');
+  const filter='id=eq.'+order.id+'&status=eq.creating&provider_reference=is.null';
+  const response=await fetch(url+'/rest/v1/locke_billing_orders?'+filter,{
+    method:'PATCH',headers:{apikey:key,authorization:'Bearer '+key,'content-type':'application/json'},
+    body:JSON.stringify({status:'failed'}),cache:'no-store',signal:AbortSignal.timeout(8000),
   });
-  if(!response.ok)throw new Error('Snippe could not confirm the payment');
-  return payment.parse((await response.json()).data);
+  if(!response.ok)throw new Error('Billing rejection could not be recorded');
 }
 
 export async function billingOrderRpc(name:string, body:Record<string,unknown>) {
