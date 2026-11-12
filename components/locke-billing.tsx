@@ -98,7 +98,7 @@ export function LockeBilling({identity,connect,trialOnly,continueToWorkspace}:{
       </section>
       <section className="billing-checkout" aria-labelledby="checkout-title">
         <h2 id="checkout-title">{trialOnly?'Workspace access':'Billing'}</h2>
-        {!identity&&<><p>{trialOnly?'Sign in to start your free trial.':'Sign in to manage workspace billing.'}</p><Button onClick={connect}>Sign in</Button></>}
+        {!identity&&<><p>{trialOnly?'Sign in to start your free trial.':'Sign in to manage workspace billing.'}</p><Button onClick={connect}>{trialOnly?'Create an account or sign in':'Sign in'}</Button></>}
         {identity&&status&&<>
           {(status.access.trial_ends_at||status.access.paid_until||(showPayment&&paymentState))&&<div className="billing-status" role="status">
             {status.access.trial_ends_at&&<p>Trial ends {dateLabel(status.access.trial_ends_at)} EAT</p>}
