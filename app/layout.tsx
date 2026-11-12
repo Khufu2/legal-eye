@@ -5,7 +5,7 @@ import "./globals.css";
 import "./workspace.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://www.lockeslaw.xyz"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://app.lockeslaw.xyz"),
   title: {
     default: "LOCKE — Legal intelligence.",
     template: "%s — LOCKE",

@@ -102,7 +102,7 @@ test('scheduled corpus refresh calls the production Locke API and records succes
  globalThis.fetch=async(url,options)=>{called={url:String(url),options};return Response.json({state:'unchanged',checked:true});};
  try{
   const event=await (await import('../scripts/cloudflare/corpus_worker.mjs')).refreshTick(env);
-  assert.equal(called.url,'https://www.lockeslaw.xyz/api/corpus-refresh');
+  assert.equal(called.url,'https://app.lockeslaw.xyz/api/corpus-refresh');
   assert.equal(called.options.method,'POST');
   assert.equal(called.options.headers.authorization,'Bearer test-secret');
   assert.equal(event.state,'unchanged');

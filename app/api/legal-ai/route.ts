@@ -1,5 +1,6 @@
 import { legalOutputSchema } from "@/lib/legal/structured-output";
-import { legalModelName } from "@/lib/legal/model";
+import {billingGate} from "@/lib/legal/billing-server";
+import { legalModelFor } from "@/lib/legal/model";
 import { generateText, gateway, Output } from "ai";
 import { z } from "zod";
 import { retrieveEvidence } from "@/lib/legal/retrieval";
@@ -10,7 +11,6 @@ export const maxDuration = 60;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-const modelName = legalModelName;
 
 const requestSchema = z.object({
   action: z.enum(["research", "draft", "review"]),
@@ -79,7 +79,7 @@ async function recordGeneration(token: string, input: z.infer<typeof requestSche
     action: "record_gateway_generation",
     organization_id: input.organization_id,
     source_action: input.action,
-    model_name: modelName,
+    model_name: legalModelFor(input.action),
     prompt_sha256: await digest(prompt),
     response_sha256: await digest(answer),
     input_tokens: usage.inputTokens,
@@ -112,6 +112,9 @@ export async function POST(request: Request) {
     const memberships = membershipCheck.ok ? await membershipCheck.json().catch(() => []) : [];
     if (!membershipCheck.ok || !memberships?.length) return response({ error: "Organization access denied" }, 403);
 
+    const billing = await billingGate(input.organization_id);
+    if (billing) return billing;
+    const modelName = legalModelFor(input.action);
     const gatewayOptions = { gateway: { user: user.id, tags: [`feature:${input.action}`, "product:legal-eye", "classification:confidential"] } };
     const started = Date.now();
 

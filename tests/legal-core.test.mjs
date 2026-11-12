@@ -17,4 +17,4 @@ test('long research questions build bounded legal searches instead of giant OR q
 });
 test('Word output is an OOXML archive with escaped legal text and styled headings',()=>{const output=createDocx('A & B','## Duties\n**Notice** < 30 days\nKiswahili: wajibu');const b=Buffer.from(output);assert.equal(b.readUInt32LE(0),0x04034b50);assert.equal(b.readUInt32LE(b.length-22),0x06054b50);const text=b.toString('utf8');assert.match(text,/word\/document.xml/);assert.match(text,/A &amp; B/);assert.match(text,/&lt; 30 days/);assert.match(text,/<w:b\/>/);assert.match(text,/Heading2/);assert.match(text,/wajibu/);});
 
-test('durable workflow calls the configured production app origin',()=>{assert.equal(workflowApiUrl('https://www.lockeslaw.xyz'),'https://www.lockeslaw.xyz/api/workflows');assert.equal(workflowApiUrl(),'https://www.lockeslaw.xyz/api/workflows');});
+test('durable workflow calls the configured production app origin',()=>{assert.equal(workflowApiUrl('https://app.lockeslaw.xyz'),'https://app.lockeslaw.xyz/api/workflows');assert.equal(workflowApiUrl(),'https://app.lockeslaw.xyz/api/workflows');});

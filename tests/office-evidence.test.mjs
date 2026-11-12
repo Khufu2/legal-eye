@@ -57,3 +57,12 @@ test('Word can insert after the captured selection without replacing it',async()
  await replaceWordSelection({run:fn=>fn({document:{getSelection:()=>({text:'Original',load(){},insertText(text,where){location=where;}})},sync:async()=>{}})},'Original','New text',false,'After');
  assert.equal(location,'After');
 });
+
+test('Word redline refuses to apply after any document body change', async () => {
+  let applied = false;
+  const selection = {text:'Exact clause',load(){},insertText(){applied = true;}};
+  const body = {text:'Exact clause with another paragraph edited',load(){}};
+  const word = {run:fn=>fn({document:{getSelection:()=>selection,body},sync:async()=>{}})};
+  await assert.rejects(replaceWordSelection(word,'Exact clause','Replacement',true,'Replace','Exact clause'),/document changed/);
+  assert.equal(applied,false);
+});

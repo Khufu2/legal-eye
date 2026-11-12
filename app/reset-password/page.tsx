@@ -1,5 +1,6 @@
 "use client";
 
+import {appOrigin} from "@/lib/legal/app-origin";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ export default function ResetPassword() {
     try {
       if (!supabaseUrl || !supabaseKey) throw new Error("Account recovery is temporarily unavailable. Please contact support.");
       if (mode === "update" && !token.current) throw new Error("Open a new password reset link to continue.");
-      const response = await authRequest(mode === "update" ? `${supabaseUrl}/auth/v1/user` : `${supabaseUrl}/auth/v1/recover?redirect_to=${encodeURIComponent(window.location.origin + "/reset-password")}`, {
+      const response = await authRequest(mode === "update" ? `${supabaseUrl}/auth/v1/user` : `${supabaseUrl}/auth/v1/recover?redirect_to=${encodeURIComponent(appOrigin + "/reset-password")}`, {
         method: mode === "update" ? "PUT" : "POST",
         headers: { apikey: supabaseKey, "content-type": "application/json", ...(mode === "update" ? { Authorization: `Bearer ${token.current}` } : {}) },
         body: JSON.stringify(mode === "update" ? { password } : { email: email.trim() }),
