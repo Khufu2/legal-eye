@@ -39,13 +39,31 @@ export function LockeBilling({identity,connect}:{identity:Identity|null;connect:
     if(!identity||pending)return;
     setPending(true);setError('');
     try{
-      const number=phone.trim().replace(/^\+/,'').replace(/^0/,'255');
+      const number=phone.trim().replace(/[\s()-]/g,'').replace(/^\+/,'').replace(/^0/,'255');
       setStatus(await action<BillingStatus>(identity,'/api/billing',{
         action:kind,...(kind==='checkout'?{phone:number,firstName,lastName}:{}),
       }));
     }catch(e){setError(e instanceof Error?e.message:'Billing is temporarily unavailable.');}
     finally{setPending(false);}
   }
+
+  useEffect(()=>{
+    if(!identity||pending||status?.payment?.status!=='pending')return;
+    let active=true;
+    let attempts=0;
+    let timer:ReturnType<typeof setTimeout>;
+    async function check() {
+      if(!identity)return;
+      try{
+        const next=await action<BillingStatus>(identity,'/api/billing',{action:'status'});
+        if(!active)return;
+        if(next.payment?.status!=='pending'){setStatus(next);return;}
+      }catch{/* The manual status check remains available. */}
+      if(active&&++attempts<24)timer=setTimeout(check,5000);
+    }
+    timer=setTimeout(check,5000);
+    return()=>{active=false;clearTimeout(timer);};
+  },[identity,pending,status?.payment?.status]);
 
   function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,16 +95,16 @@ export function LockeBilling({identity,connect}:{identity:Identity|null;connect:
             {paymentState&&<strong>{paymentLabels[paymentState]||'Check payment status'}</strong>}
           </div>}
           {status.canManage&&!status.access.trial_ends_at&&!status.access.paid_until&&<Button disabled={pending} onClick={()=>void request('trial')}>Start free trial</Button>}
-          {status.canManage&&paymentState==='pending'&&<><p>Approve the request on your phone. Then check the payment status here.</p><Button disabled={pending} onClick={()=>void request('reconcile')}>Check payment status</Button></>}
+          {status.canManage&&paymentState==='pending'&&<><p>Approve the mobile-money prompt on your phone. You can keep this page open on your computer while it updates.</p><Button disabled={pending} onClick={()=>void request('reconcile')}>Check payment status</Button></>}
           {status.canManage&&status.checkoutEnabled&&paymentState!=='pending'&&
             <form onSubmit={submit}>
               <div className="billing-names">
                 <label className="billing-field">First name<Input value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" required maxLength={80}/></label>
                 <label className="billing-field">Last name<Input value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" required maxLength={80}/></label>
               </div>
-              <label className="billing-field">Mobile money number<Input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" required maxLength={13}/></label>
+              <label className="billing-field">Mobile money number<Input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="07XX XXX XXX" required maxLength={18}/></label>
               <Button className="billing-submit" type="submit" disabled={pending}><Smartphone size={18}/>{paymentState==='creating'?'Retry payment request':'Pay TZS 49,000'}</Button>
-              <small>Powered by Snippe. Approve on your phone using your provider’s secure prompt.</small>
+              <small>A single payment. Approve it with your mobile-money provider on any supported phone, including a basic phone.</small>
             </form>}
           {!status.checkoutEnabled&&<p>Mobile money checkout is currently unavailable.</p>}
           {!status.canManage&&<p>Your workspace owner or admin manages billing.</p>}
