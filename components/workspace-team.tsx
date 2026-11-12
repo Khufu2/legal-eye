@@ -1,5 +1,6 @@
 "use client";
 
+import {appOrigin} from "@/lib/legal/app-origin";
 import {useEffect, useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -36,7 +37,7 @@ export function WorkspaceTeam({identity}:{identity:Identity}) {
   return <section className="workspace-team">
     <h2>Firm team</h2><p>Invite colleagues to this workspace. Invite links work only with the recipient’s verified email and expire after seven days. Use Portal for client access to selected matters.</p>
     {error&&<div className="inline-error" role="alert">{error}</div>}
-    <form className="team-invite-form" onSubmit={e=>{e.preventDefault();void act(async()=>{const token=await rpc<string>("create_workspace_invite",{p_organization_id:identity.organization_id,p_email:email,p_role:role});setLink(`${window.location.origin}/#invite=${token}`);setEmail("");});}}>
+    <form className="team-invite-form" onSubmit={e=>{e.preventDefault();void act(async()=>{const token=await rpc<string>("create_workspace_invite",{p_organization_id:identity.organization_id,p_email:email,p_role:role});setLink(`${appOrigin}/#invite=${token}`);setEmail("");});}}>
       <label>Colleague’s email<Input required type="email" autoComplete="off" value={email} onChange={e=>setEmail(e.target.value)}/></label>
       <label>Role<select value={role} onChange={e=>setRole(e.target.value)}>{roles.filter(r=>identity.role==="owner"||r!=="admin").map(r=><option key={r} value={r}>{label(r)}</option>)}</select></label>
       <Button type="submit" disabled={busy}>Create invite link</Button>

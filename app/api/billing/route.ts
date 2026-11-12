@@ -46,7 +46,7 @@ export async function POST(request:Request) {
         if(Date.now()-Date.parse(order.created_at)>=23*60*60*1000)return reply({error:'This payment requires support to reconcile before retrying.'},409);
         const created=await snippePayment('',{key:order.id.replaceAll('-','').slice(0,30),body:{
           payment_type:'mobile',details,phone_number:args.phone,customer,
-          webhook_url:'https://www.lockeslaw.xyz/api/billing/webhook',metadata:{locke_order_id:order.id},
+          webhook_url:'https://app.lockeslaw.xyz/api/billing/webhook',metadata:{locke_order_id:order.id},
         }});
         // Only an authenticated status lookup or signed callback can grant access.
         order=await reconcile(order,{...created,status:'pending'});

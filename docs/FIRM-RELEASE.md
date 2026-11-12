@@ -14,11 +14,15 @@ The Word and Outlook manifests use the production domain. Word can review its do
 | Firm | Quote after usage validation | Firm playbooks, shared matters, review tables, onboarding and training. Price by seats and measured workload. |
 | Enterprise | Custom contract | Scope SSO, audit export, retention, approved models and regions, document system integration, support and service levels with the customer. Include only controls that have been delivered and verified. |
 
+## App domain
+
+Set Supabase Authentication → URL Configuration Site URL to https://app.lockeslaw.xyz and allow the app root, /reset-password and /portal/* on that host. Keep confirmation and recovery templates based on the Supabase confirmation URL. Add https://app.lockeslaw.xyz to the Google OAuth client's authorized JavaScript origins and the Picker API key's referrers.
+
 ## Billing activation
 
 1. Apply the billing migration to the Locke database. Confirm the billing tables and RPCs are inaccessible to anonymous and authenticated Data API roles.
 2. Set the Locke project service-role JWT in Vercel as LOCKE_BILLING_SUPABASE_SERVICE_ROLE_KEY. Provision a Locke-specific payment key and webhook signing secret as LOCKE_SNIPPE_API_KEY and LOCKE_SNIPPE_WEBHOOK_SECRET.
-3. Register the production callback https://www.lockeslaw.xyz/api/billing/webhook for the documented Snippe payment events. Verify the version, signature and metadata. Exercise success, duplicate delivery, concurrent renewals, failure and reconciliation in a test workspace.
+3. Register the production callback https://app.lockeslaw.xyz/api/billing/webhook for the documented Snippe payment events. Verify the version, signature and metadata. Exercise success, duplicate delivery, concurrent renewals, failure and reconciliation in a test workspace.
 4. Enable NEXT_PUBLIC_LOCKE_BILLING_VISIBLE and LOCKE_SNIPPE_ENABLED after configuration and checks. Keep LOCKE_BILLING_ENFORCED off until existing accounts have entitlements and applicable AI routes are covered. Core research, drafting, review and work APIs honor this flag. An active trial or confirmed payment does not itself authorize a workspace to process confidential client matters.
 5. Confirm payment receipts, merchant and tax setup, refund handling, support for unresolved payments and cost limits before accepting paying customers.
 

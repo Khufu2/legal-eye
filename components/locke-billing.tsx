@@ -2,6 +2,8 @@
 
 import {useEffect,useState,type FormEvent} from 'react';
 import {action,type Identity} from '@/lib/legal/client';
+import {Check,Smartphone} from 'lucide-react';
+import './locke-billing.css';
 import {Button} from './ui/button';
 import {Input} from './ui/input';
 
@@ -50,33 +52,49 @@ export function LockeBilling({identity,connect}:{identity:Identity|null;connect:
     void request('checkout');
   }
 
-  return <div className="view-pad">
+  const paymentState=status?.payment?.status;
+  const paymentLabels:Record<string,string>={
+    creating:'Request awaiting confirmation',pending:'Awaiting phone approval',completed:'Payment confirmed',
+    failed:'Payment failed',voided:'Payment cancelled',expired:'Payment expired',
+  };
+
+  return <div className="view-pad locke-billing">
     <div className="live-header"><div><h1>Billing</h1><p>Manage access for your Locke workspace.</p></div></div>
-    <section className="intelligence-input-card" style={{padding:'1rem',maxWidth:'42rem'}}>
-      <h2>Starter</h2>
-      <p><strong>TZS 49,000</strong> for 30 days of workspace access. Renew manually with Tanzanian mobile money.</p>
-      <p>Start a 14-day trial without a payment method.</p>
-      {!identity&&<Button onClick={connect}>Sign in to manage billing</Button>}
-      {identity&&status&&<>
-        {status.access.trial_ends_at&&<p>Trial end: {dateLabel(status.access.trial_ends_at)} EAT</p>}
-        {status.access.paid_until&&<p>Paid through: {dateLabel(status.access.paid_until)} EAT</p>}
-        {status.payment&&<p role="status">Latest payment: {status.payment.status}</p>}
-        {status.payment?.status==='pending'&&<p>Approve the prompt on your phone, then check payment status.</p>}
-        {status.canManage&&!status.access.trial_ends_at&&!status.access.paid_until&&<Button disabled={pending} onClick={()=>void request('trial')}>Start 14-day trial</Button>}
-        {status.canManage&&status.payment?.status==='pending'&&<Button disabled={pending} onClick={()=>void request('reconcile')}>Check payment status</Button>}
-        {status.canManage&&status.checkoutEnabled&&status.payment?.status!=='pending'&&
-          <form onSubmit={submit} style={{display:'grid',gap:'.75rem',marginTop:'1rem'}}>
-            <label>First name<Input value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" required maxLength={80}/></label>
-            <label>Last name<Input value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" required maxLength={80}/></label>
-            <label>Mobile money number<Input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" autoComplete="tel" placeholder="07XXXXXXXX" required maxLength={13}/></label>
-            <Button type="submit" disabled={pending}>{status.payment?.status==='creating'?'Retry existing TZS 49,000 request':'Request TZS 49,000 mobile payment'}</Button>
-          </form>}
-        {!status.checkoutEnabled&&<p>Mobile money checkout is currently unavailable.</p>}
-        {!status.canManage&&<p>Your workspace owner or admin manages billing.</p>}
-      </>}
-      {identity&&!status&&!error&&<p role="status">Loading workspace billing…</p>}
-      {error&&<p role="alert">{error}</p>}
-      {identity&&<Button variant="ghost" disabled={pending} onClick={()=>void request('status')}>Refresh billing</Button>}
-    </section>
+    <div className="billing-grid">
+      <section className="billing-plan" aria-labelledby="starter-plan">
+        <h2 id="starter-plan">Starter</h2>
+        <div className="billing-price"><strong>TZS 49,000</strong><span>/ 30 days</span></div>
+        <p>Research, review documents, and run legal workflows.</p>
+        <div className="billing-trial"><Check size={18}/><div><strong>14-day free trial</strong><p>No payment method required. Renew manually by mobile money.</p></div></div>
+      </section>
+      <section className="billing-checkout" aria-labelledby="checkout-title">
+        <h2 id="checkout-title">Workspace access</h2>
+        {!identity&&<><p>Sign in to start your trial or manage payments.</p><Button onClick={connect}>Sign in</Button></>}
+        {identity&&status&&<>
+          {(status.access.trial_ends_at||status.access.paid_until||paymentState)&&<div className="billing-status" role="status">
+            {status.access.trial_ends_at&&<p>Trial ends {dateLabel(status.access.trial_ends_at)} EAT</p>}
+            {status.access.paid_until&&<p>Paid through {dateLabel(status.access.paid_until)} EAT</p>}
+            {paymentState&&<strong>{paymentLabels[paymentState]||'Check payment status'}</strong>}
+          </div>}
+          {status.canManage&&!status.access.trial_ends_at&&!status.access.paid_until&&<Button disabled={pending} onClick={()=>void request('trial')}>Start free trial</Button>}
+          {status.canManage&&paymentState==='pending'&&<><p>Approve the request on your phone. Then check the payment status here.</p><Button disabled={pending} onClick={()=>void request('reconcile')}>Check payment status</Button></>}
+          {status.canManage&&status.checkoutEnabled&&paymentState!=='pending'&&
+            <form onSubmit={submit}>
+              <div className="billing-names">
+                <label className="billing-field">First name<Input value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" required maxLength={80}/></label>
+                <label className="billing-field">Last name<Input value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" required maxLength={80}/></label>
+              </div>
+              <label className="billing-field">Mobile money number<Input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="07XXXXXXXX" required maxLength={13}/></label>
+              <Button className="billing-submit" type="submit" disabled={pending}><Smartphone size={18}/>{paymentState==='creating'?'Retry payment request':'Pay TZS 49,000'}</Button>
+              <small>Powered by Snippe. Approve on your phone using your provider’s secure prompt.</small>
+            </form>}
+          {!status.checkoutEnabled&&<p>Mobile money checkout is currently unavailable.</p>}
+          {!status.canManage&&<p>Your workspace owner or admin manages billing.</p>}
+        </>}
+        {identity&&!status&&!error&&<p role="status">Loading workspace billing…</p>}
+        {error&&<p className="billing-error" role="alert">{error}</p>}
+        {identity&&<Button variant="ghost" disabled={pending} onClick={()=>void request('status')}>Refresh billing</Button>}
+      </section>
+    </div>
   </div>;
 }

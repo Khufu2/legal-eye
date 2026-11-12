@@ -1,5 +1,6 @@
 "use client";
 
+import {appOrigin} from "@/lib/legal/app-origin";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleDriveImport } from "@/components/google-drive-import";
 import "./connections/connections.css";
@@ -210,7 +211,7 @@ function LegalEye() {
     const fields=validateAuthFields({email,password,signup:true,firm:firmName,requireFirm:!pendingInvite});setAuthFields(fields);setAuthError("");if(Object.keys(fields).length)return;
     setAuthBusy(true);setAuthError("");
     try{
-      const response=await authRequest(SUPABASE_URL+`/auth/v1/signup?redirect_to=${encodeURIComponent(window.location.origin)}`,{method:"POST",headers:{apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({email:email.trim(),password})});
+      const response=await authRequest(SUPABASE_URL+`/auth/v1/signup?redirect_to=${encodeURIComponent(appOrigin)}`,{method:"POST",headers:{apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({email:email.trim(),password})});
       const data=await response.json();if(!response.ok)throw new Error(authErrorMessage(data,response.status));
       safeSessionStorage.setItem("locke-pending-firm",firmName.trim());setPassword("");setAuthMode("verify");
     }catch(error){setAuthError(error instanceof TypeError?authErrorMessage(error):error instanceof Error?error.message:authErrorMessage(error))}finally{setAuthBusy(false)}
@@ -220,7 +221,7 @@ function LegalEye() {
     const fields=validateAuthFields({email});setAuthFields(fields);setAuthError("");if(Object.keys(fields).length)return;
     setAuthBusy(true);
     try{
-      const response=await authRequest(SUPABASE_URL+`/auth/v1/resend?redirect_to=${encodeURIComponent(window.location.origin)}`,{method:"POST",headers:{apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({type:"signup",email:email.trim()})});
+      const response=await authRequest(SUPABASE_URL+`/auth/v1/resend?redirect_to=${encodeURIComponent(appOrigin)}`,{method:"POST",headers:{apikey:SUPABASE_KEY,"content-type":"application/json"},body:JSON.stringify({type:"signup",email:email.trim()})});
       const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(authErrorMessage(data,response.status));
       toast.success("Check your email",{description:"If this account needs confirmation, a new link will arrive. Check your spam folder too."});
     }catch(error){setAuthError(error instanceof Error?error.message:authErrorMessage(error))}finally{setAuthBusy(false)}

@@ -1,6 +1,6 @@
 # LOCKE supervised lawyer evaluation
 
-Application: https://www.lockeslaw.xyz/
+Application: https://app.lockeslaw.xyz/
 
 **Handoff scope — 11 November 2026.** This guide is for a supervised lawyer evaluation, not a release certificate for unrestricted client work. Use public-law research and fictional or de-identified files. Do not upload live client matters until the firm has completed its security, privacy, accuracy and operational review.
 
