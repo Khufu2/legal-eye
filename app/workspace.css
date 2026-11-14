@@ -885,3 +885,8 @@ input[type=checkbox]{accent-color:var(--primary);width:15px;height:15px;flex-shr
 .guide-office{border-top:1px solid var(--line);margin-top:22px;padding-top:8px}
 .locke-guide .guide-note{margin:14px 4px 0;font-size:11px}
 @media(max-width:700px){.guide-start,.guide-tools{grid-template-columns:1fr}.locke-guide .desk-heading{align-items:flex-start;gap:8px;flex-direction:column}.guide-start article{padding:18px}}
+
+/* Consistent LOCKE uppercase editorial wordmark */
+.sidebar-brand b,.workspace-brand-mobile .locke-wordmark,.workspace-boot .locke-wordmark{font-family:var(--font-serif),Georgia,'Times New Roman',serif;font-weight:400;letter-spacing:-.05em;text-transform:uppercase}
+.workspace-brand-mobile .locke-wordmark{font-size:22px;line-height:1}
+.workspace-boot .locke-wordmark{font-size:36px;letter-spacing:-.05em}
