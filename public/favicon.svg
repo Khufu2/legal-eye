@@ -1,4 +1,1 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="3.5" y="3.5" width="25" height="25" rx="7" stroke="#F2F1ED" stroke-width="1.5"/>
-  <path d="M11 9V22H21" stroke="#F2F1ED" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" rx="48" fill="#1c2120"/><text x="128" y="145" text-anchor="middle" dominant-baseline="middle" font-family="Georgia, 'Times New Roman', serif" font-size="70" letter-spacing="-5" fill="#f4f1eb">Locke.</text></svg>
