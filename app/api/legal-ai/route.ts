@@ -153,9 +153,11 @@ export async function POST(request: Request) {
         providerOptions: gatewayOptions,
       });
       const citationAudit=auditResearchCitations(generated.text,publicEvidence,privateEvidence);
+      const warnings=[...citationAudit.warnings];
+      if(evidence.partialPublicSearch)warnings.push('Some public-source searches did not complete. The answer covers the passages available for this request.');
       const answer=citationAudit.unknownLabels.length
         ? 'Citation verification failed: the generated answer referenced evidence that was not supplied. No legal conclusion is shown. Retry with a narrower question and inspect the source passages.'
-        : generated.text+(citationAudit.warnings.length?'\n\n## Verification notes\n\n'+citationAudit.warnings.map(w=>`- ${w}`).join('\n'):'');
+        : generated.text+(warnings.length?'\n\n## Verification notes\n\n'+warnings.map(w=>`- ${w}`).join('\n'):'');
       await recordGeneration(token, input, prompt, answer, generated.totalUsage, started);
       return response({ ...evidence, answer, citationAudit, provider: "vercel-ai-gateway", model: modelName });
     }
