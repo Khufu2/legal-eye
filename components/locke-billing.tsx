@@ -7,19 +7,22 @@ import './locke-billing.css';
 import {Button} from './ui/button';
 import {Input} from './ui/input';
 
+type PaymentSummary={status:string;createdAt:string;amount:number;canReplace:boolean};
+
 type BillingStatus={
   access:{trial_ends_at:string|null;paid_until:string|null};
   canManage:boolean;
   checkoutEnabled:boolean;
-  payment:{status:string;createdAt:string}|null;
+  payment:PaymentSummary|null;
+  history:PaymentSummary[];
 };
 
 function dateLabel(value:string) {
   return new Intl.DateTimeFormat('en-TZ',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Dar_es_Salaam'}).format(new Date(value));
 }
 
-export function LockeBilling({identity,connect,trialOnly,continueToWorkspace}:{
-  identity:Identity|null;connect:()=>void;trialOnly:boolean;continueToWorkspace:()=>void;
+export function LockeBilling({identity,connect,trialOnly,continueToWorkspace,embedded=false}:{
+  identity:Identity|null;connect:()=>void;trialOnly:boolean;continueToWorkspace:()=>void;embedded?:boolean;
 }) {
   const [status,setStatus]=useState<BillingStatus|null>(null);
   const [pending,setPending]=useState(false);
@@ -79,7 +82,8 @@ export function LockeBilling({identity,connect,trialOnly,continueToWorkspace}:{
     void request('checkout');
   }
 
-  const paymentState=status?.payment?.status;
+  const canReplace=status?.payment?.canReplace??false;
+  const paymentState=canReplace?'expired':status?.payment?.status;
   const canStartTrial=status?.canManage&&!status.access.trial_ends_at&&!status.access.paid_until;
   const canContinue=[status?.access.trial_ends_at,status?.access.paid_until].some(end=>end&&Date.parse(end)>Date.now());
   const paymentLabels:Record<string,string>={
@@ -87,39 +91,40 @@ export function LockeBilling({identity,connect,trialOnly,continueToWorkspace}:{
     failed:'Payment failed',voided:'Payment cancelled',expired:'Payment expired',
   };
 
-  return <div className="view-pad locke-billing">
-    <div className="live-header"><div><h1>{trialOnly?'Start your free trial':'Settings'}</h1><p>{trialOnly?'Try Locke for 14 days. No payment details required.':'Manage your workspace plan and payments.'}</p></div></div>
-    <div className="billing-grid">
-      <section className="billing-plan" aria-labelledby="starter-plan">
+  return <div className={embedded?'locke-billing':'view-pad locke-billing'}>
+    {!embedded&&<div className="live-header"><div><h1>{trialOnly?'Start your free trial':'Settings'}</h1><p>{trialOnly?'Try Locke for 14 days. No payment details required.':'Manage your workspace plan and payments.'}</p></div></div>}
+    <div className={trialOnly?"billing-grid billing-grid-trial":"billing-grid"}>
+      {!trialOnly&&<section className="billing-plan" aria-labelledby="starter-plan">
         <h2 id="starter-plan">Starter</h2>
         <div className="billing-price"><strong>TZS 49,000</strong><span>/ 30 days</span></div>
         <p>Research, review documents, and run legal workflows.</p>
         <div className="billing-trial"><Check size={18}/><div><strong>14-day free trial</strong><p>No payment method required. Renew manually by mobile money.</p></div></div>
-      </section>
+      </section>}
       <section className="billing-checkout" aria-labelledby="checkout-title">
-        <h2 id="checkout-title">{trialOnly?'Workspace access':'Billing'}</h2>
-        {!identity&&<><p>{trialOnly?'Sign in to start your free trial.':'Sign in to manage workspace billing.'}</p><Button onClick={connect}>{trialOnly?'Create an account or sign in':'Sign in'}</Button></>}
+        <h2 id="checkout-title">{trialOnly?'14 days of Locke Starter':'Plan and payments'}</h2>
+        {!identity&&<><p>{trialOnly?'Create your workspace to research with sources, review documents and run workflows.':'Sign in to manage workspace billing.'}</p><Button onClick={connect}>{trialOnly?'Create an account or sign in':'Sign in'}</Button></>}
         {identity&&status&&<>
           {(status.access.trial_ends_at||status.access.paid_until||(showPayment&&paymentState))&&<div className="billing-status" role="status">
-            {status.access.trial_ends_at&&<p>Trial ends {dateLabel(status.access.trial_ends_at)} EAT</p>}
+            {status.access.trial_ends_at&&<p>{Date.parse(status.access.trial_ends_at)>Date.now()?'Trial ends':'Trial ended'} {dateLabel(status.access.trial_ends_at)} EAT</p>}
             {status.access.paid_until&&<p>Paid through {dateLabel(status.access.paid_until)} EAT</p>}
             {showPayment&&paymentState&&<strong>{paymentLabels[paymentState]||'Check payment status'}</strong>}
           </div>}
           {canStartTrial&&!showPayment&&<Button disabled={pending} onClick={()=>void request('trial')}>{pending?'Starting…':'Start free trial'}</Button>}
           {trialOnly&&canContinue&&<Button onClick={continueToWorkspace}>Continue to workspace</Button>}
-          {trialOnly&&status.canManage&&!canStartTrial&&!canContinue&&<><p>Your trial has ended.</p><a href="/?view=settings">Open billing settings</a></>}
+          {trialOnly&&status.canManage&&!canStartTrial&&!canContinue&&<><p>Your trial has ended.</p><a href="/?view=settings&amp;section=billing">Open billing settings</a></>}
           {!trialOnly&&status.canManage&&status.checkoutEnabled&&!showPayment&&<div><Button variant={canStartTrial?'ghost':'outline'} disabled={pending} onClick={()=>{setShowPayment(true);setError('')}}>Manage payments</Button></div>}
           {showPayment&&status.canManage&&paymentState==='pending'&&<><p>Approve the mobile-money prompt on your phone. You can keep this page open on your computer while it updates.</p></>}
           {showPayment&&status.canManage&&status.checkoutEnabled&&paymentState!=='pending'&&
             <form onSubmit={submit}>
-              {paymentState==='creating'&&<p>Check the earlier request before sending again. If asked to retry, use the same name and number.</p>}
+              {canReplace&&<p>The previous request expired. Enter the payment details you want to use now.</p>}
+              {paymentState==='creating'&&<p>A recent request is still open. Check its status before sending another request.</p>}
               <div className="billing-names">
                 <label className="billing-field">First name<Input value={firstName} onChange={e=>setFirstName(e.target.value)} autoComplete="given-name" required maxLength={80}/></label>
                 <label className="billing-field">Last name<Input value={lastName} onChange={e=>setLastName(e.target.value)} autoComplete="family-name" required maxLength={80}/></label>
               </div>
               <label className="billing-field">Mobile money number<Input value={phone} onChange={e=>setPhone(e.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="07XX XXX XXX" required maxLength={18}/></label>
               <Button className="billing-submit" type="submit" disabled={pending}><Smartphone size={18}/>{paymentState==='creating'?'Retry payment request':'Pay TZS 49,000'}</Button>
-              <small>A single payment. Approve it with your mobile-money provider on any supported phone, including a basic phone.</small>
+              <small>One payment for 30 days. Approve the prompt on the phone linked to your mobile-money account.</small>
             </form>}
           {!trialOnly&&!status.checkoutEnabled&&<p>Mobile money checkout is currently unavailable.</p>}
           {!status.canManage&&<p>Your workspace owner or admin manages billing.</p>}
@@ -130,5 +135,13 @@ export function LockeBilling({identity,connect,trialOnly,continueToWorkspace}:{
         {!showPayment&&identity&&error&&<Button variant="ghost" disabled={pending} onClick={()=>void request('status')}>Refresh workspace access</Button>}
       </section>
     </div>
+    {!trialOnly&&status?.history?.length? <section className="billing-checkout billing-history" aria-labelledby="payment-history-title">
+      <h2 id="payment-history-title">Recent payments</h2>
+      <ul>{status.history.map((payment,index)=><li key={payment.createdAt+index}>
+        <span>{dateLabel(payment.createdAt)} EAT</span>
+        <strong>TZS {(payment.amount??49_000).toLocaleString('en-TZ')}</strong>
+        <span>{paymentLabels[payment.canReplace?'expired':payment.status]||payment.status}</span>
+      </li>)}</ul>
+    </section>:null}
   </div>;
 }
