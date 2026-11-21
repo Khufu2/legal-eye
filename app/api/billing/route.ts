@@ -13,7 +13,11 @@ const input = z.discriminatedUnion('action',[
     lastName:z.string().trim().min(1).max(80)}),
 ]);
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'cache-control':'no-store'}});
-const latest=(org:string)=>billingDb<BillingOrder[]>('locke_billing_orders?organization_id=eq.'+org+'&order=created_at.desc&limit=1');
+const orders=(org:string,limit:number)=>billingDb<BillingOrder[]>('locke_billing_orders?select=id,amount,currency,status,created_at,provider_reference,request_digest&organization_id=eq.'+org+'&order=created_at.desc&limit='+limit);
+const latest=(org:string)=>orders(org,1);
+const freshCheckoutAfter=30*60*60*1000;
+const paymentSummary=(order:BillingOrder)=>({status:order.status,createdAt:order.created_at,amount:order.amount,
+  canReplace:order.status==='creating'&&!order.provider_reference&&Date.now()-Date.parse(order.created_at)>=freshCheckoutAfter});
 const checkoutReady=()=>process.env.LOCKE_SNIPPE_ENABLED==='1'&&!!process.env.LOCKE_SNIPPE_API_KEY?.trim()&&!!process.env.LOCKE_SNIPPE_WEBHOOK_SECRET;
 
 export async function POST(request:Request) {
@@ -33,10 +37,13 @@ export async function POST(request:Request) {
       [order]=await latest(org);
       if(order&&['creating','pending'].includes(order.status)){
         const reference=order.provider_reference||await findSnippePayment(order);
-        if(!reference)return reply({error:'Snippe has not returned a reference for this request. If the request is recent, retry with the same details. Contact Locke support if it has been more than 23 hours.'},409);
-        const verified=await snippePayment('/'+encodeURIComponent(reference));
-        if(verified.reference!==reference)throw new Error('Unexpected payment reference');
-        order=await reconcile(order,verified);
+        if(reference){
+          const verified=await snippePayment('/'+encodeURIComponent(reference));
+          if(verified.reference!==reference)throw new Error('Unexpected payment reference');
+          order=await reconcile(order,verified);
+        }else if(!paymentSummary(order).canReplace){
+          return reply({error:'Snippe has not confirmed this request yet. Check again later.'},409);
+        }
       }
     }else if(args.action==='checkout'){
       if(!checkoutReady())return reply({error:'Mobile money checkout is not available yet.'},503);
@@ -46,9 +53,13 @@ export async function POST(request:Request) {
       const digest=createHmac('sha256',secret).update(JSON.stringify([org,customer,args.phone])).digest('hex');
       stage='reserve';
       order=await billingOrderRpc('locke_reserve_checkout',{p_org:org,p_digest:digest});
-      if(!order.provider_reference){
-        if(order.request_digest!==digest)return reply({error:'An earlier checkout is awaiting confirmation. Retry with its original details.'},409);
-        if(Date.now()-Date.parse(order.created_at)>=23*60*60*1000)return reply({error:'This payment requires support to reconcile before retrying.'},409);
+      if(order.provider_reference&&order.status==='pending'){
+        const verified=await snippePayment('/'+encodeURIComponent(order.provider_reference));
+        if(verified.reference!==order.provider_reference)throw new Error('Unexpected payment reference');
+        order=await reconcile(order,verified);
+      }else if(!order.provider_reference){
+        if(order.request_digest!==digest)return reply({error:'A recent payment request is still open. Check its status before entering new payment details.'},409);
+        if(Date.now()-Date.parse(order.created_at)>=23*60*60*1000)return reply({error:'This payment request is still settling. Check its status and try again later.'},409);
         stage='create_payment';
         let reference:string;
         try{
@@ -70,9 +81,11 @@ export async function POST(request:Request) {
       }
     }
     stage='load_access';
-    if(!order)[order]=await latest(org);
-    return reply({access:await billingAccess(org),canManage:member.canManage,checkoutEnabled:checkoutReady(),
-      payment:order?{status:order.status,createdAt:order.created_at}:null});
+    const [history,access]=await Promise.all([orders(org,member.canManage?10:1),billingAccess(org)]);
+    const current=history[0];
+    return reply({access,canManage:member.canManage,checkoutEnabled:checkoutReady(),
+      payment:current?paymentSummary(current):null,
+      history:member.canManage?history.map(paymentSummary):[]});
   }catch(error){
     if(error instanceof SnippeError){
       console.warn('Locke Snippe request failed',{stage,status:error.httpStatus,code:error.code});
