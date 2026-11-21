@@ -101,6 +101,7 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
   };
 
   const queries=buildSearchQueries(options.query);
+  let partialPublicSearch=false;
   const publicSearch = async () => {
     const corpusUrl = process.env.LEGAL_CORPUS_URL?.trim();
     const corpusToken = process.env.LEGAL_CORPUS_SEARCH_TOKEN?.trim();
@@ -111,7 +112,7 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
       const conceptual=await conceptualSearchQuery(safeQuery);
       const focused=/misconduct|disciplinary/i.test(options.query) && /terminat|dismiss|procedur|hearing/i.test(options.query) ? 'employment termination unfair procedure' : null;
       const plans=[...new Set([focused,searchQuery,conceptual].filter((query):query is string=>Boolean(query)))];
-      const responses=await Promise.all(plans.map(async query=>{
+      const responses=await Promise.allSettled(plans.map(async query=>{
         const result = await fetch(`${corpusUrl.replace(/\/$/, '')}/search`, {
           method: 'POST', headers: { authorization: `Bearer ${corpusToken}`, 'content-type': 'application/json' },
           body: JSON.stringify({query,jurisdictions:options.jurisdictions,limit:24}),
@@ -120,8 +121,18 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
         if(!result.ok)throw new Error(`Public legal corpus search is unavailable (${result.status}). No legal conclusion was generated.`);
         const data=await result.json();if(!Array.isArray(data.evidence))throw new Error('Public corpus returned an invalid evidence response.');return data.evidence;
       }));
+      const results=responses.flatMap(result=>result.status==='fulfilled'?[result.value]:[]);
+      partialPublicSearch=results.length<responses.length;
+      if(partialPublicSearch&&!results.some(rows=>rows.length)){
+        throw new Error('Public legal corpus search did not return enough results to complete the search. Please retry.');
+      }
       const unique=new Map<string,Record<string,unknown>>();
-      for(const row of responses.flat())if(!unique.has(row.chunk_id))unique.set(row.chunk_id,row);
+      for(let rank=0;rank<24&&unique.size<32;rank++){
+        for(const rows of results){
+          const row=rows[rank];
+          if(row&&!unique.has(row.chunk_id))unique.set(row.chunk_id,row);
+        }
+      }
       return [...unique.values()].slice(0,32);
     }
     let lastError: unknown = null;
@@ -148,5 +159,5 @@ export async function retrieveEvidence(options: {url:string;key:string;authoriza
   ]);
   const [rankedPublic,rankedPrivate]=await Promise.all([rerankEvidence(options.query,publicEvidence),rerankEvidence(options.query,privateEvidence)]);
   const firmCitator=options.privateContext===false?{entries:[],coverage:'Firm knowledge disabled',absence_means:'unknown',current_good_law_verified:false}:await lookupFirmTreatment({...options,evidence:rankedPublic.evidence});
-  return {firmCitator,publicEvidence:rankedPublic.evidence.slice(0,16),privateEvidence:rankedPrivate.evidence.slice(0,12),retrievalMethods:{public:rankedPublic.method,private:rankedPrivate.method},retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
+  return {firmCitator,partialPublicSearch,publicEvidence:rankedPublic.evidence.slice(0,16),privateEvidence:rankedPrivate.evidence.slice(0,12),retrievalMethods:{public:rankedPublic.method,private:rankedPrivate.method},retrievalState:publicEvidence.length || privateEvidence.length ? 'retrieved' : 'no-evidence'};
 }
